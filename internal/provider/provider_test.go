@@ -10,17 +10,17 @@ package provider_test
 // 	"github.com/stretchr/testify/require"
 // )
 
-// func TestGenericRestProvider_Metadata(t *testing.T) {
+// func TestrestProvider_Metadata(t *testing.T) {
 // 	p := provider.New
 // 	resp := &provider.MetadataResponse{}
 
 // 	p.Metadata(context.Background(), provider.MetadataRequest{}, resp)
 
-// 	require.Equal(t, "genericrest", resp.TypeName)
+// 	require.Equal(t, "rest", resp.TypeName)
 // 	require.Equal(t, "test", resp.Version)
 // }
 
-// func TestGenericRestProvider_Schema(t *testing.T) {
+// func TestrestProvider_Schema(t *testing.T) {
 // 	p := provider.New("test")()
 // 	resp := &provider.SchemaResponse{}
 
@@ -32,7 +32,7 @@ package provider_test
 // 	require.Contains(t, resp.Schema.Attributes, "api_header")
 // }
 
-// func TestGenericRestProvider_Configure(t *testing.T) {
+// func TestrestProvider_Configure(t *testing.T) {
 // 	p := provider.New("test")()
 // 	resp := &provider.ConfigureResponse{}
 

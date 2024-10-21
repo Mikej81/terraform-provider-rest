@@ -21,8 +21,8 @@ To install the Generic REST Provider, add the following configuration to your Te
 ```hcl
 terraform {
   required_providers {
-    genericrest = {
-      source  = "local/genericrest"
+    rest = {
+      source  = "local/rest"
       version = "0.1.0"
     }
   }
@@ -36,7 +36,7 @@ Run the `terraform init` command to download and install the provider.
 You can configure the provider to connect to your REST API by setting up the required parameters:
 
 ```hcl
-provider "genericrest" {
+provider "rest" {
   api_token  = var.API_TOKEN
   api_header = var.API_TOKEN_HEADER
   api_url    = var.API_URL
@@ -54,7 +54,7 @@ provider "genericrest" {
 To retrieve data from an API endpoint:
 
 ```hcl
-data "genericrest_data" "example" {
+data "rest_data" "example" {
   endpoint      = "/api/web/namespaces/system/tenant/settings"
   timeout       = 30  # Timeout in seconds for data source request
   insecure      = true # Disable SSL verification if needed
@@ -62,7 +62,7 @@ data "genericrest_data" "example" {
 }
 
 output "data_response" {
-  value = data.genericrest_data.example.response
+  value = data.rest_data.example.response
 }
 ```
 
@@ -75,7 +75,7 @@ locals {
   resource_name = "dc-cluster-group-1"
 }
 
-resource "genericrest_resource" "resource" {
+resource "rest_resource" "resource" {
   name          = local.resource_name
   endpoint      = "/api/config/namespaces/system/dc_cluster_groups"
   timeout       = 30  # Timeout in seconds for resource request
@@ -101,7 +101,7 @@ resource "genericrest_resource" "resource" {
 }
 
 output "resource_response" {
-  value = genericrest_resource.resource.response
+  value = rest_resource.resource.response
 }
 ```
 

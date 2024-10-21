@@ -14,7 +14,7 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ provider.Provider = &genericrestProvider{}
+	_ provider.Provider = &restProvider{}
 )
 
 // APIClient is a simple REST client for interacting with the API.
@@ -27,14 +27,14 @@ type APIClient struct {
 // New is a helper function to simplify provider server and testing implementation.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &genericrestProvider{
+		return &restProvider{
 			version: version,
 		}
 	}
 }
 
-// genericrestProvider is the provider implementation.
-type genericrestProvider struct {
+// restProvider is the provider implementation.
+type restProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
@@ -42,13 +42,13 @@ type genericrestProvider struct {
 }
 
 // Metadata returns the provider type name.
-func (p *genericrestProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "genericrest"
+func (p *restProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "rest"
 	resp.Version = p.version
 }
 
 // Schema defines the provider-level schema for configuration data.
-func (p *genericrestProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *restProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"api_token": schema.StringAttribute{
@@ -67,8 +67,8 @@ func (p *genericrestProvider) Schema(_ context.Context, _ provider.SchemaRequest
 	}
 }
 
-// Configure prepares a genericrest API client for data sources and resources.
-func (p *genericrestProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+// Configure prepares a rest API client for data sources and resources.
+func (p *restProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	// Extract provider configuration values
 	var config struct {
 		APIToken  types.String `tfsdk:"api_token"`
@@ -104,14 +104,14 @@ func (p *genericrestProvider) Configure(ctx context.Context, req provider.Config
 }
 
 // DataSources defines the data sources implemented in the provider.
-func (p *genericrestProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+func (p *restProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewRestDataSource,
 	}
 }
 
 // Resources defines the resources implemented in the provider.
-func (p *genericrestProvider) Resources(_ context.Context) []func() resource.Resource {
+func (p *restProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewRestResource,
 	}
