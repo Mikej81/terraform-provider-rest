@@ -19,7 +19,10 @@ provider "rest" {
 resource "rest_resource" "application" {
   name     = "my-application"
   endpoint = "/api/v1/applications"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -53,7 +56,10 @@ resource "rest_resource" "application" {
 resource "rest_resource" "application_config" {
   name     = "config-${rest_resource.application.response_data.id}"
   endpoint = "/api/v1/configurations"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -84,7 +90,10 @@ data "rest_data" "application_status" {
 resource "rest_resource" "monitoring_alert" {
   name     = "alert-${rest_resource.application.response_data.id}"
   endpoint = "/api/v1/alerts"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"

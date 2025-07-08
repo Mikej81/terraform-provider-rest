@@ -246,6 +246,61 @@ Compare this with what Terraform is doing.
 
 See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
 
+### **Method Configuration Issues**
+
+#### **Issue: Wrong HTTP Method Used**
+
+**Symptoms:**
+- `Error: HTTP request failed: 405 Method Not Allowed`
+- API returns method not supported error
+- Operations fail with method-specific errors
+
+**Solutions:**
+
+1. **Use new method configuration (recommended):**
+   ```terraform
+   resource "rest_resource" "api_resource" {
+     name     = "my-resource"
+     endpoint = "/api/resources"
+     
+     # Configure different methods for each operation
+     create_method = "POST"    # Create with POST
+     read_method   = "GET"     # Read with GET
+     update_method = "PATCH"   # Update with PATCH
+     delete_method = "DELETE"  # Delete with DELETE
+     
+     body = jsonencode({data = "value"})
+   }
+   ```
+
+2. **For APIs that use POST for everything:**
+   ```terraform
+   resource "rest_resource" "post_only_api" {
+     name     = "my-resource"
+     endpoint = "/api/operations"
+     
+     create_method = "POST"
+     read_method   = "POST"
+     update_method = "POST"
+     delete_method = "POST"
+     
+     body = jsonencode({action = "create", data = "value"})
+     update_body = jsonencode({action = "update", data = "value"})
+     destroy_body = jsonencode({action = "delete"})
+   }
+   ```
+
+3. **Legacy method configuration (deprecated):**
+   ```terraform
+   resource "rest_resource" "legacy_resource" {
+     name     = "my-resource"
+     endpoint = "/api/resources"
+     method   = "PUT"  # Only affects create operation
+     
+     body = jsonencode({data = "value"})
+   }
+   ```
+
 ### **Resource Management Issues**
 
 #### **Issue: Resource Not Found on Read**
@@ -261,6 +316,13 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
    resource "rest_resource" "user" {
      name     = "john-doe"  # This must match your API's identifier
      endpoint = "/users"
+     
+     # Configure methods for each operation
+     create_method = "POST"
+     read_method   = "GET"
+     update_method = "PUT"
+     delete_method = "DELETE"
+     
      body     = jsonencode({name = "John Doe"})
    }
    ```
@@ -277,6 +339,13 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
    resource "rest_resource" "user" {
      name     = "123"  # Use the ID from the API
      endpoint = "/users"
+     
+     # Configure methods for each operation
+     create_method = "POST"
+     read_method   = "GET"
+     update_method = "PUT"
+     delete_method = "DELETE"
+     
      body     = jsonencode({name = "John Doe"})
    }
    ```
@@ -301,6 +370,26 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
    terraform show
    
    # Write configuration to match
+   ```
+   
+   ```terraform
+   # Example matching configuration
+   resource "rest_resource" "imported_user" {
+     name     = "john-doe"
+     endpoint = "/api/v1/users"
+     
+     # Configure methods for each operation
+     create_method = "POST"
+     read_method   = "GET"
+     update_method = "PUT"
+     delete_method = "DELETE"
+     
+     body = jsonencode({
+       name  = "John Doe"
+       email = "john@example.com"
+       # Match the current state of the resource
+     })
+   }
    ```
 
 3. **Check for drift after import:**

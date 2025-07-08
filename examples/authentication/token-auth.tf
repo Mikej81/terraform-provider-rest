@@ -24,7 +24,12 @@ provider "rest" {
 resource "rest_resource" "user" {
   name     = "john-doe"
   endpoint = "/api/v1/users"
-  method   = "POST"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"

@@ -23,7 +23,10 @@ provider "rest" {
 resource "rest_resource" "api_service" {
   name     = var.service_name
   endpoint = "/api/v1/services"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -47,7 +50,10 @@ resource "rest_resource" "api_service" {
 resource "rest_resource" "api_route" {
   name     = "${var.service_name}-route"
   endpoint = "/api/v1/routes"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -74,7 +80,10 @@ resource "rest_resource" "api_route" {
 resource "rest_resource" "rate_limit_plugin" {
   name     = "${var.service_name}-rate-limit"
   endpoint = "/api/v1/plugins"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -105,7 +114,10 @@ resource "rest_resource" "auth_plugin" {
   
   name     = "${var.service_name}-auth"
   endpoint = "/api/v1/plugins"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -128,7 +140,10 @@ resource "rest_resource" "cors_plugin" {
   
   name     = "${var.service_name}-cors"
   endpoint = "/api/v1/plugins"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -159,7 +174,10 @@ resource "rest_resource" "api_consumer" {
   
   name     = var.consumers[count.index].username
   endpoint = "/api/v1/consumers"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -178,7 +196,10 @@ resource "rest_resource" "consumer_api_key" {
   
   name     = "${var.consumers[count.index].username}-key"
   endpoint = "/api/v1/consumers/${rest_resource.api_consumer[count.index].response_data.id}/key-auth"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"

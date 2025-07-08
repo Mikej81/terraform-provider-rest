@@ -22,7 +22,10 @@ provider "rest" {
 resource "rest_resource" "monitoring_workspace" {
   name     = var.workspace_name
   endpoint = "/api/v1/workspaces"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -45,7 +48,10 @@ resource "rest_resource" "monitoring_workspace" {
 resource "rest_resource" "prometheus_datasource" {
   name     = "${var.workspace_name}-prometheus"
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/datasources"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -74,7 +80,10 @@ resource "rest_resource" "prometheus_datasource" {
 resource "rest_resource" "application_dashboard" {
   name     = "${var.application_name}-dashboard"
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/dashboards"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -202,7 +211,10 @@ resource "rest_resource" "application_dashboard" {
 resource "rest_resource" "high_error_rate_alert" {
   name     = "${var.application_name}-high-error-rate"
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/alerts"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -249,7 +261,10 @@ resource "rest_resource" "high_error_rate_alert" {
 resource "rest_resource" "high_latency_alert" {
   name     = "${var.application_name}-high-latency"
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/alerts"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -298,7 +313,10 @@ resource "rest_resource" "slack_notification" {
   
   name     = "${var.application_name}-slack"
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/notifications"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -332,7 +350,10 @@ data "rest_data" "alert_status" {
 # Get dashboard metrics
 data "rest_data" "dashboard_metrics" {
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/metrics"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"

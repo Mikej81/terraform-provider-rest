@@ -34,7 +34,7 @@ Then run `terraform init` to download the provider.
 ## What Makes This Provider Different
 
 - **Multiple Authentication Methods**: Token, client certificates (mTLS), and PKCS12 support
-- **Complete HTTP Method Support**: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+- **Complete HTTP Method Support**: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS with per-operation method configuration
 - **Dynamic Response Parsing**: Automatic JSON parsing with accessible key-value outputs
 - **Import/Export Support**: Full Terraform import and export functionality
 - **Robust Error Handling**: Exponential backoff retry logic with configurable attempts

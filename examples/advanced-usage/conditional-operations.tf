@@ -22,7 +22,10 @@ provider "rest" {
 resource "rest_resource" "strict_validation" {
   name     = "strict-user"
   endpoint = "/api/v1/users"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -44,7 +47,10 @@ resource "rest_resource" "strict_validation" {
 resource "rest_resource" "flexible_handling" {
   name     = "flexible-item"
   endpoint = "/api/v1/items"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -66,7 +72,10 @@ resource "rest_resource" "flexible_handling" {
 resource "rest_resource" "custom_retry" {
   name     = "retry-item"
   endpoint = "/api/v1/queue/items"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -91,7 +100,10 @@ resource "rest_resource" "custom_retry" {
 resource "rest_resource" "strict_requirements" {
   name     = "strict-validation"
   endpoint = "/api/v1/validation"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -115,7 +127,10 @@ resource "rest_resource" "strict_requirements" {
 resource "rest_resource" "stop_on_success" {
   name     = "one-time-action"
   endpoint = "/api/v1/actions/trigger"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -137,7 +152,10 @@ resource "rest_resource" "stop_on_success" {
 resource "rest_resource" "complex_handling" {
   name     = "complex-workflow"
   endpoint = "/api/v1/workflows"
-  method   = "POST"
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"

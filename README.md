@@ -35,7 +35,7 @@ Supports the authentication methods you're already using:
 - **PKCS12 Bundles**: Enterprise certificate formats
 
 ### **Universal HTTP Support**
-Works with any REST API using standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS). If your API follows REST conventions, this provider can manage it.
+Works with any REST API using standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS). Configure different methods for each operation (create, read, update, delete) to match your API's requirements.
 
 ### **Smart Response Handling**
 Automatically parses JSON responses so you can access individual fields in your Terraform configurations. No more parsing JSON in bash scripts!
@@ -82,6 +82,13 @@ provider "rest" {
 resource "rest_resource" "my_user" {
   name     = "john-doe"
   endpoint = "/users"
+  
+  # Use specific methods for different operations
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name  = "John Doe"
     email = "john@example.com"
@@ -178,7 +185,15 @@ output "user_email" {
 resource "rest_resource" "user" {
   name     = "john-doe"
   endpoint = "/api/users"
-  method   = "POST"
+  
+  # New method configuration (recommended)
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
+  # Legacy method configuration (deprecated but still supported)
+  # method = "POST"  # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"
@@ -215,7 +230,12 @@ output "created_at" {
 resource "rest_resource" "api_configuration" {
   name     = "prod-config"
   endpoint = "/api/v2/configurations"
-  method   = "POST"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PATCH"  # Use PATCH for partial updates
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type"    = "application/json"
@@ -263,7 +283,11 @@ All resources provide these computed attributes for accessing response data:
 
 ### Configurable Attributes
 
-- **method**: HTTP method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- **create_method**: HTTP method for create operations (POST, PUT, PATCH)
+- **read_method**: HTTP method for read operations (GET, POST, HEAD)
+- **update_method**: HTTP method for update operations (PUT, PATCH, POST)
+- **delete_method**: HTTP method for delete operations (DELETE, POST, PUT)
+- **method**: HTTP method for create operations (DEPRECATED - use create_method instead)
 - **headers**: Custom HTTP headers as key-value pairs
 - **query_params**: URL query parameters as key-value pairs
 - **body**: Request body for create operations

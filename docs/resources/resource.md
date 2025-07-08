@@ -47,7 +47,15 @@ The `rest_resource` is your main tool for creating and managing resources throug
 resource "rest_resource" "user" {
   name     = "john-doe"        # Unique identifier for this resource
   endpoint = "/api/users"       # API endpoint to call
-  method   = "POST"             # HTTP method for creation
+  
+  # New method configuration (recommended)
+  create_method = "POST"        # HTTP method for creation
+  read_method   = "GET"         # HTTP method for reading
+  update_method = "PUT"         # HTTP method for updates
+  delete_method = "DELETE"      # HTTP method for deletion
+  
+  # Legacy method configuration (deprecated but still supported)
+  # method = "POST"             # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"
@@ -91,7 +99,12 @@ output "user_details" {
 resource "rest_resource" "api_config" {
   name     = "production-config"
   endpoint = "/api/configurations"
-  method   = "POST"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PATCH"       # Use PATCH for partial updates
+  delete_method = "DELETE"
   
   # Custom headers for your API's requirements
   headers = {
@@ -428,7 +441,15 @@ provider "rest" {
 resource "rest_resource" "user" {
   name     = "john-doe"
   endpoint = "/users"
-  method   = "POST"
+  
+  # New method configuration (recommended)
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
+  # Legacy method configuration (deprecated but still supported)
+  # method = "POST"  # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"

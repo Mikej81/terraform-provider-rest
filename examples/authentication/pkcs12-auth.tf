@@ -24,7 +24,12 @@ provider "rest" {
 resource "rest_resource" "enterprise_policy" {
   name     = "security-policy-2024"
   endpoint = "/api/v2/policies"
-  method   = "POST"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type"     = "application/json"

@@ -22,7 +22,12 @@ provider "rest" {
 resource "rest_resource" "user_profile" {
   name     = "user-profile-${var.user_id}"
   endpoint = "/api/v1/users/${var.user_id}/profile"
-  method   = "PATCH"  # Use PATCH for partial updates
+  
+  # Configure methods for each operation
+  create_method = "PATCH"  # Use PATCH for partial updates
+  read_method   = "GET"
+  update_method = "PATCH"  # Use PATCH for partial updates
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type" = "application/json"
@@ -102,7 +107,12 @@ data "rest_data" "resource_exists" {
 resource "rest_resource" "document_upload" {
   name     = "document-${var.user_id}"
   endpoint = "/api/v1/documents"
-  method   = "POST"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   headers = {
     "Content-Type"   = "application/json"

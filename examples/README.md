@@ -37,7 +37,15 @@ provider "rest" {
 resource "rest_resource" "example" {
   name     = "my-resource"
   endpoint = "/api/v1/items"
-  method   = "POST"
+  
+  # New method configuration (recommended)
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
+  # Legacy method configuration (deprecated but still supported)
+  # method = "POST"  # Only affects create operation
   
   body = jsonencode({
     name = "Example Item"
@@ -81,6 +89,7 @@ output "resource_id" {
 - **File**: `advanced-usage/custom-operations.tf`
 - **Features**:
   - All HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+  - Per-operation method configuration (create_method, read_method, update_method, delete_method)
   - Custom headers and query parameters
   - Conditional operations
   - Complex request patterns
@@ -106,6 +115,54 @@ output "resource_id" {
   - Notification channels
 
 ## Key Features Demonstrated
+
+### New Method Configuration (Recommended)
+```hcl
+resource "rest_resource" "example" {
+  name     = "my-resource"
+  endpoint = "/api/resources"
+  
+  # Configure methods for each CRUD operation
+  create_method = "POST"    # Method for creating resources
+  read_method   = "GET"     # Method for reading resources
+  update_method = "PATCH"   # Method for updating resources
+  delete_method = "DELETE"  # Method for deleting resources
+  
+  body = jsonencode({
+    name = "Example Resource"
+    type = "demo"
+  })
+}
+
+# APIs that use POST for everything
+resource "rest_resource" "post_only_api" {
+  name     = "my-resource"
+  endpoint = "/api/operations"
+  
+  create_method = "POST"
+  read_method   = "POST"
+  update_method = "POST"
+  delete_method = "POST"
+  
+  body = jsonencode({action = "create", data = "value"})
+  update_body = jsonencode({action = "update", data = "value"})
+  destroy_body = jsonencode({action = "delete"})
+}
+```
+
+### Legacy Method Configuration (Deprecated)
+```hcl
+resource "rest_resource" "legacy_example" {
+  name     = "my-resource"
+  endpoint = "/api/resources"
+  method   = "POST"  # Only affects create operation
+  
+  body = jsonencode({
+    name = "Example Resource"
+    type = "demo"
+  })
+}
+```
 
 ### Dynamic Response Access
 ```hcl
@@ -144,6 +201,12 @@ provider "rest" {
 ### Custom Request Bodies
 ```hcl
 resource "rest_resource" "example" {
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PATCH"
+  delete_method = "DELETE"
+  
   # Different bodies for different operations
   body        = jsonencode({ action = "create" })
   update_body = jsonencode({ action = "update", version = 2 })
