@@ -131,16 +131,12 @@ jobs:
           CURRENT_TAG="${{ steps.version.outputs.version }}"
           
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "## Changes since $PREVIOUS_TAG" > /tmp/CHANGELOG.md
-            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s" >> /tmp/CHANGELOG.md
+            CHANGELOG="Changes since $PREVIOUS_TAG"
           else
-            echo "## Initial Release" > /tmp/CHANGELOG.md
-            echo "- First release of terraform-provider-rest" >> /tmp/CHANGELOG.md
+            CHANGELOG="Initial Release"
           fi
           
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/CHANGELOG.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
 
       - name: Select release config
         id: release_config
