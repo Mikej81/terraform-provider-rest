@@ -119,6 +119,10 @@ jobs:
             echo "config_file=.goreleaser.v2.yml" >> $GITHUB_OUTPUT  
             echo "Using signed release config"
           fi
+          
+      - name: Set config environment variable
+        run: |
+          echo "GORELEASER_CONFIG=${{ steps.config.outputs.config_file }}" >> $GITHUB_ENV
 
       - name: Generate changelog
         id: changelog
@@ -138,13 +142,24 @@ jobs:
           cat CHANGELOG.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Select release config
+        id: release_config
+        run: |
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
+            echo "Using unsigned release config"
+          else
+            echo "config_file=.goreleaser.v2.yml" >> $GITHUB_OUTPUT  
+            echo "Using signed release config"
+          fi
+
       - name: Run GoReleaser (Dry Run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --clean --config ${{ needs.validate.outputs.config_file || '.goreleaser.v2.yml' }}
+          args: release --snapshot --clean --config ${{ steps.release_config.outputs.config_file }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
@@ -155,7 +170,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --config ${{ needs.validate.outputs.config_file || '.goreleaser.v2.yml' }}
+          args: release --clean --config ${{ steps.release_config.outputs.config_file }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
