@@ -60,8 +60,8 @@ type RestResourceModel struct {
 	FailOnStatus   types.List   `tfsdk:"fail_on_status"`
 	RetryOnStatus  types.List   `tfsdk:"retry_on_status"`
 	// Drift detection configuration
-	IgnoreFields   types.List   `tfsdk:"ignore_fields"`
-	DriftDetection types.Bool   `tfsdk:"drift_detection"`
+	IgnoreFields   types.List `tfsdk:"ignore_fields"`
+	DriftDetection types.Bool `tfsdk:"drift_detection"`
 }
 
 func (r *RestResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -857,17 +857,17 @@ func (r *RestResource) performDriftDetection(ctx context.Context, data *RestReso
 
 	// Get the list of fields to ignore during drift detection
 	ignoreFields := make(map[string]bool)
-	
+
 	// Add default fields that are commonly server-managed
 	defaultIgnoreFields := []string{
-		"id", "created_at", "updated_at", "last_modified", "etag", 
+		"id", "created_at", "updated_at", "last_modified", "etag",
 		"version", "revision", "timestamp", "last_updated_at",
 		"created_by", "updated_by", "modified_by", "owner_id",
 		"_id", "_created", "_updated", "_modified", "_version",
 		"createdAt", "updatedAt", "lastModified", "lastUpdated",
 		"href", "self", "links", "_links", "meta", "_meta",
 	}
-	
+
 	for _, field := range defaultIgnoreFields {
 		ignoreFields[field] = true
 	}
@@ -897,7 +897,7 @@ func (r *RestResource) performDriftDetection(ctx context.Context, data *RestReso
 
 	// Compare the structured data
 	driftDetected := r.compareStructuredData(ctx, expectedData, currentData, ignoreFields, "")
-	
+
 	if driftDetected {
 		tflog.Warn(ctx, "configuration drift detected", map[string]interface{}{
 			"resource_id": data.Id.ValueString(),
@@ -928,7 +928,7 @@ func (r *RestResource) compareStructuredData(ctx context.Context, expected, curr
 		currentValue, exists := current[key]
 		if !exists {
 			tflog.Debug(ctx, "field missing in current response", map[string]interface{}{
-				"field": fieldPath,
+				"field":    fieldPath,
 				"expected": expectedValue,
 			})
 			driftDetected = true
@@ -938,9 +938,9 @@ func (r *RestResource) compareStructuredData(ctx context.Context, expected, curr
 		// Compare values based on type
 		if !r.valuesEqual(expectedValue, currentValue) {
 			tflog.Debug(ctx, "field value drift detected", map[string]interface{}{
-				"field": fieldPath,
+				"field":    fieldPath,
 				"expected": expectedValue,
-				"current": currentValue,
+				"current":  currentValue,
 			})
 			driftDetected = true
 		}
@@ -961,7 +961,7 @@ func (r *RestResource) compareStructuredData(ctx context.Context, expected, curr
 // compareRawResponse compares raw string responses
 func (r *RestResource) compareRawResponse(ctx context.Context, data *RestResourceModel, currentResponse string, ignoreFields map[string]bool) error {
 	expectedResponse := data.Body.ValueString()
-	
+
 	if expectedResponse != currentResponse {
 		tflog.Debug(ctx, "raw response drift detected", map[string]interface{}{
 			"expected_length": len(expectedResponse),
