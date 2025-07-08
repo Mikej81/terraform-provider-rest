@@ -121,13 +121,13 @@ terraform import rest_resource.existing_user "api/users/existing-user-id"
 
 ### Read-Only (Computed)
 
-- `id` (String) The identifier for the created resource
+- `id` (String) The identifier for the created resource (extracted from API response or generated)
 - `response` (String) The raw response body from the most recent API request
 - `status_code` (Number) The HTTP status code from the most recent API request
 - `response_data` (Map of String) Parsed JSON response as key-value pairs for dynamic access
 - `response_headers` (Map of String) HTTP response headers as key-value pairs
-- `created_at` (String) Timestamp when the resource was created
-- `last_updated` (String) Timestamp when the resource was last updated
+- `created_at` (String) RFC3339 timestamp when the resource was created
+- `last_updated` (String) RFC3339 timestamp when the resource was last updated
 
 ## Accessing Dynamic Response Data
 
@@ -140,15 +140,150 @@ resource "rest_resource" "api_call" {
 
 # Access specific response fields
 output "resource_id" {
-  value = rest_resource.api_call.response_data.id
+  value = rest_resource.api_call.response_data["id"]
 }
 
 output "resource_status" {
-  value = rest_resource.api_call.response_data.status
+  value = rest_resource.api_call.response_data["status"]
 }
 
 output "nested_field" {
-  value = rest_resource.api_call.response_data.metadata
+  value = rest_resource.api_call.response_data["metadata"]
+}
+```
+
+## Output Usage Examples
+
+### Basic Outputs
+
+```terraform
+resource "rest_resource" "user" {
+  endpoint = "/users"
+  name     = "john-doe"
+  body     = jsonencode({
+    name  = "John Doe"
+    email = "john@example.com"
+  })
+}
+
+output "user_id" {
+  description = "The ID of the created user"
+  value       = rest_resource.user.id
+}
+
+output "user_status_code" {
+  description = "HTTP status code from user creation"
+  value       = rest_resource.user.status_code
+}
+
+output "user_created_at" {
+  description = "When the user was created"
+  value       = rest_resource.user.created_at
+}
+```
+
+### Response Data Extraction
+
+```terraform
+resource "rest_resource" "api_key" {
+  endpoint = "/api-keys"
+  name     = "service-key"
+  body     = jsonencode({
+    name        = "Service API Key"
+    permissions = ["read", "write"]
+  })
+}
+
+output "api_key_token" {
+  description = "The generated API key token"
+  value       = rest_resource.api_key.response_data["token"]
+  sensitive   = true
+}
+
+output "api_key_expires_at" {
+  description = "When the API key expires"
+  value       = rest_resource.api_key.response_data["expires_at"]
+}
+```
+
+### Response Headers
+
+```terraform
+resource "rest_resource" "deployment" {
+  endpoint = "/deployments"
+  name     = "app-v1"
+  body     = jsonencode({
+    image    = "app:v1.0"
+    replicas = 3
+  })
+}
+
+output "deployment_location" {
+  description = "Location header from deployment response"
+  value       = rest_resource.deployment.response_headers["Location"]
+}
+
+output "deployment_etag" {
+  description = "ETag header for caching"
+  value       = rest_resource.deployment.response_headers["ETag"]
+}
+```
+
+### Resource Chaining
+
+```terraform
+resource "rest_resource" "project" {
+  endpoint = "/projects"
+  name     = "my-project"
+  body     = jsonencode({
+    name        = "My Project"
+    description = "A sample project"
+  })
+}
+
+resource "rest_resource" "database" {
+  endpoint = "/databases"
+  name     = "project-db"
+  body     = jsonencode({
+    name       = "project-database"
+    project_id = rest_resource.project.id
+  })
+}
+
+output "database_connection" {
+  description = "Database connection information"
+  value = {
+    host     = rest_resource.database.response_data["host"]
+    port     = rest_resource.database.response_data["port"]
+    database = rest_resource.database.response_data["name"]
+  }
+}
+```
+
+### Type Conversion
+
+```terraform
+resource "rest_resource" "metrics" {
+  endpoint = "/metrics"
+  name     = "app-metrics"
+  body     = jsonencode({
+    metric_name = "cpu_usage"
+    threshold   = 80
+  })
+}
+
+locals {
+  # Convert string values to appropriate types
+  threshold_number = tonumber(rest_resource.metrics.response_data["threshold"])
+  is_enabled       = tobool(rest_resource.metrics.response_data["enabled"])
+}
+
+output "metric_configuration" {
+  description = "Processed metric configuration"
+  value = {
+    threshold = local.threshold_number
+    enabled   = local.is_enabled
+  }
 }
 ```
 
