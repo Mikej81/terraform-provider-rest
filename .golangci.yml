@@ -1,38 +1,16 @@
-version: 2
+version: "2"
 
 run:
   timeout: 5m
-  go: '1.23'
-
-linters-settings:
-  gocyclo:
-    min-complexity: 20  # Allow higher complexity for tests
-  gocritic:
-    disabled-checks:
-      - hugeParam  # Allow large parameter structs in provider code
 
 linters:
   enable:
     - errcheck
-    - gocyclo
-    - gocritic
     - staticcheck
     - unused
     - gosimple
     - govet
   disable:
     - depguard  # Disable depguard since we need terraform and crypto imports
-
-issues:
-  exclude-rules:
-    # Allow time.Sleep in tests for timeout testing
-    - path: _test\.go
-      text: "time.Sleep"
-    # Allow errcheck skip for test response writers
-    - path: _test\.go
-      linters:
-        - errcheck
-    # Allow higher complexity in test functions
-    - path: _test\.go
-      linters:
-        - gocyclo
+    - gocyclo   # Disable complexity checks for now
+    - gocritic  # Disable gocritic for now

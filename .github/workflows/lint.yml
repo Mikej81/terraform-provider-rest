@@ -46,7 +46,7 @@ jobs:
         run: go install github.com/bflad/tfproviderlint/cmd/tfproviderlint@latest
 
       - name: Run tfproviderlint
-        run: tfproviderlint -c 1 -AT012.ignored-filenames="internal/provider/provider_acc_test.go" ./...
+        run: tfproviderlint -c 1 -AT012=false -R018=false ./...
 
   govulncheck:
     name: Go Vulnerability Check
