@@ -1,3 +1,5 @@
+version: 2
+
 run:
   timeout: 5m
   go: '1.23'
@@ -5,12 +7,6 @@ run:
 linters-settings:
   gocyclo:
     min-complexity: 20  # Allow higher complexity for tests
-  depguard:
-    rules:
-      main:
-        deny:
-          # Remove restrictions on terraform-plugin-log and crypto packages
-          # These are legitimate dependencies for a Terraform provider
   gocritic:
     disabled-checks:
       - hugeParam  # Allow large parameter structs in provider code
