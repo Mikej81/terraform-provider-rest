@@ -152,9 +152,17 @@ jobs:
       - name: Configure GPG for non-interactive use
         if: env.GPG_PRIVATE_KEY != ''
         run: |
-          export GPG_TTY=$(tty)
-          echo "GPG_TTY=$(tty)" >> $GITHUB_ENV
-          gpg --batch --yes --pinentry-mode loopback --list-secret-keys
+          # Configure GPG for non-interactive use
+          mkdir -p ~/.gnupg
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "batch" >> ~/.gnupg/gpg.conf
+          echo "yes" >> ~/.gnupg/gpg.conf
+          chmod 700 ~/.gnupg
+          chmod 600 ~/.gnupg/gpg.conf
+          
+          # Test GPG configuration
+          gpg --batch --yes --list-secret-keys
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
@@ -168,7 +176,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          GPG_TTY: ${{ env.GPG_TTY }}
 
       - name: Run GoReleaser (Release)
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
@@ -180,7 +187,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          GPG_TTY: ${{ env.GPG_TTY }}
 
       - name: Upload release artifacts
         if: github.event.inputs.dry_run != 'true'
