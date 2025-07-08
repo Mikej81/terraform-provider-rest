@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"net/http"
 	"net/url"
 	"strings"
@@ -438,7 +438,7 @@ func configureTLSAuth(config Config, tlsConfig *tls.Config) error {
 
 	// Handle PKCS12 Authentication (file-based)
 	if config.PKCS12File != "" {
-		pkcs12Data, err := ioutil.ReadFile(config.PKCS12File)
+		pkcs12Data, err := os.ReadFile(config.PKCS12File)
 		if err != nil {
 			return fmt.Errorf("failed to read PKCS12 file: %w", err)
 		}

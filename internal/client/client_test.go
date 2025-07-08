@@ -198,7 +198,7 @@ func TestRestClient_Do(t *testing.T) {
 				}
 
 				w.WriteHeader(tt.serverResponse)
-				w.Write([]byte(tt.serverBody))
+				_, _ = w.Write([]byte(tt.serverBody))
 			}))
 			defer server.Close()
 
@@ -254,11 +254,11 @@ func TestRestClient_Retry(t *testing.T) {
 		if attemptCount < 3 {
 			// Fail first two attempts with retryable status code
 			w.WriteHeader(500)
-			w.Write([]byte("Server Error"))
+			_, _ = w.Write([]byte("Server Error"))
 		} else {
 			// Succeed on third attempt
 			w.WriteHeader(200)
-			w.Write([]byte("Success"))
+			_, _ = w.Write([]byte("Success"))
 		}
 	}))
 	defer server.Close()

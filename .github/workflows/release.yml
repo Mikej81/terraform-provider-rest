@@ -75,11 +75,11 @@ jobs:
           govulncheck ./...
 
       - name: Validate GoReleaser config
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: check
+          args: check --config .goreleaser.v2.yml
 
   # Main release job
   goreleaser:
@@ -125,22 +125,22 @@ jobs:
 
       - name: Run GoReleaser (Dry Run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --skip-sign --clean
+          args: release --snapshot --skip-sign --clean --config .goreleaser.v2.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
       - name: Run GoReleaser (Release)
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --clean --config .goreleaser.v2.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}

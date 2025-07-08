@@ -24,7 +24,7 @@ jobs:
           check-latest: true
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           args: --timeout=5m
@@ -46,7 +46,7 @@ jobs:
         run: go install github.com/bflad/tfproviderlint/cmd/tfproviderlint@latest
 
       - name: Run tfproviderlint
-        run: tfproviderlint -c 1 ./...
+        run: tfproviderlint -c 1 -config .tfproviderlint.yml ./...
 
   govulncheck:
     name: Go Vulnerability Check
@@ -76,10 +76,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          scan-args: |-
-            -r
-            --skip-git
-            ./
+          go-version: '1.23'
+          check-latest: true
+
+      - name: Install OSV Scanner
+        run: go install github.com/google/osv-scanner/cmd/osv-scanner@latest
+
+      - name: Run OSV Scanner
+        run: osv-scanner -r --skip-git .

@@ -145,28 +145,16 @@ func TestAccRestResource_Basic(t *testing.T) {
 }
 
 func testAccRestDataSourceConfig(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url    = "%s"
-  api_token  = "test-token"
-  api_header = "Authorization"
-}
-
+	return `
 data "rest_data" "test" {
   endpoint = "/test"
   method   = "GET"
 }
-`, baseURL)
+`
 }
 
 func testAccRestResourceConfig(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url    = "%s"
-  api_token  = "test-token"
-  api_header = "Authorization"
-}
-
+	return `
 resource "rest_resource" "test" {
   endpoint = "/items"
   name     = "test"
@@ -176,16 +164,11 @@ resource "rest_resource" "test" {
     type = "example"
   })
 }
-`, baseURL)
+`
 }
 
 func testAccRestResourceConfigUpdated(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url    = "%s"
-  api_token  = "test-token"
-  api_header = "Authorization"
-}
+	return `
 
 resource "rest_resource" "test" {
   endpoint = "/items"
@@ -201,7 +184,7 @@ resource "rest_resource" "test" {
     status = "active"
   })
 }
-`, baseURL)
+`
 }
 
 func testAccCheckRestResourceExists(resourceName string, resourceState *string) resource.TestCheckFunc {
@@ -374,13 +357,7 @@ func TestAccRestResource_ErrorHandling(t *testing.T) {
 }
 
 func testAccRestResourceConfigWithHeaders(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url       = "%s"
-  api_token     = "test-token"
-  api_header    = "Authorization"
-  retry_attempts = 3
-}
+	return `
 
 resource "rest_resource" "test" {
   endpoint = "/api/users"
@@ -400,16 +377,11 @@ resource "rest_resource" "test" {
     role = "user"
   })
 }
-`, baseURL)
+`
 }
 
 func testAccRestResourceConfigPatch(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url    = "%s"
-  api_token  = "test-token"
-  api_header = "Authorization"
-}
+	return `
 
 resource "rest_resource" "test" {
   endpoint = "/api/items"
@@ -420,18 +392,11 @@ resource "rest_resource" "test" {
     status = "modified"
   })
 }
-`, baseURL)
+`
 }
 
 func testAccRestResourceConfigRetry(baseURL string) string {
-	return fmt.Sprintf(`
-provider "rest" {
-  api_url        = "%s"
-  api_token      = "test-token"
-  api_header     = "Authorization"
-  retry_attempts = 5
-  timeout        = 30
-}
+	return `
 
 resource "rest_resource" "test" {
   endpoint = "/api/flaky"
@@ -442,5 +407,5 @@ resource "rest_resource" "test" {
     type = "test"
   })
 }
-`, baseURL)
+`
 }

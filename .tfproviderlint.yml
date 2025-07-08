@@ -1,0 +1,11 @@
+# Terraform Provider Lint Configuration
+rules:
+  # Allow time.Sleep in test files for timeout testing
+  R018:
+    exclude:
+      - "*_test.go"
+  
+  # Allow multiple test prefixes in acceptance test files
+  AT012:
+    exclude:
+      - "internal/provider/provider_acc_test.go"
