@@ -99,11 +99,14 @@ jobs:
           check-latest: true
 
       - name: Import GPG key
+        if: env.GPG_PRIVATE_KEY != ''
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Generate changelog
         id: changelog
@@ -140,10 +143,11 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --config .goreleaser.v2.yml
+          args: release --clean --config .goreleaser.v2.yml ${{ env.GPG_PRIVATE_KEY == '' && '--skip-sign' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Upload release artifacts
         if: github.event.inputs.dry_run != 'true'
