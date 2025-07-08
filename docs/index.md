@@ -7,9 +7,31 @@ description: |-
 
 # REST Provider
 
-The REST provider allows Terraform to interact with REST APIs, providing full CRUD operations with state management, drift detection, and dynamic response parsing.
+This REST provider allows Terraform to interact with REST APIs, providing full CRUD operations with state management, drift detection, and dynamic response parsing.
 
-## Features
+## How to Use This Provider
+
+Add the REST provider to your Terraform configuration:
+
+```terraform
+terraform {
+  required_providers {
+    rest = {
+      source  = "Mikej81/rest"
+      version = "1.0.5"
+    }
+  }
+}
+
+provider "rest" {
+  api_url = "https://your-api.example.com"
+  # Add authentication - see examples below
+}
+```
+
+Then run `terraform init` to download the provider.
+
+## What Makes This Provider Different
 
 - **Multiple Authentication Methods**: Token, client certificates (mTLS), and PKCS12 support
 - **Complete HTTP Method Support**: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
@@ -75,6 +97,7 @@ provider "rest" {
 ### Optional
 
 **Authentication Options (choose one method):**
+
 - `api_token` (String, Sensitive) The API token for authenticating requests
 - `api_header` (String) The HTTP header name for the API token (default: "Authorization")
 - `client_cert` (String, Sensitive) Client certificate for mTLS authentication (PEM format)
@@ -86,6 +109,7 @@ provider "rest" {
 - `pkcs12_password` (String, Sensitive) Password for PKCS12 certificate bundle
 
 **Connection Options:**
+
 - `timeout` (Number) Default timeout for HTTP requests in seconds (default: 30)
 - `insecure` (Boolean) Disable SSL certificate verification (default: false)
 - `retry_attempts` (Number) Default number of retry attempts for failed requests (default: 3)

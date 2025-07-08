@@ -1,39 +1,102 @@
 # Terraform REST Provider
 
-## Overview
+## What is this provider?
 
-The **Terraform REST Provider** enables seamless interaction with REST APIs through Infrastructure as Code. This provider supports comprehensive CRUD operations, multiple authentication methods, and advanced features for managing REST-based resources within your Terraform configurations.
+The Terraform REST Provider bridges the gap between Terraform and REST APIs, allowing you to manage any REST-based resource as if it were a native Terraform resource. Instead of writing custom scripts or manual API calls, you can declaratively manage your REST resources alongside your infrastructure.
 
-## Features
+**Think of it as a universal translator** between Terraform and any REST API - whether you're managing users in a SaaS platform, configurations in a monitoring system, or resources in a custom application.
 
-- **Complete CRUD Operations**: Create, read, update, and delete resources via REST APIs with full state management
-- **Multiple Authentication Methods**: 
-  - Token-based authentication with configurable headers
-  - Client certificate authentication (mTLS) with PEM format
-  - PKCS12 certificate bundle support
-- **Advanced HTTP Support**: All standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
-- **Dynamic Response Parsing**: Automatic JSON response parsing with accessible key-value outputs
-- **Robust Error Handling**: Exponential backoff retry logic with configurable attempts
-- **Import/Export Support**: Full Terraform import and export functionality
-- **Drift Detection**: Automatic detection and handling of configuration drift
-- **Flexible Configuration**: Custom headers, query parameters, timeouts, and SSL options
+## Why use this provider?
 
-## Installation
+Many organizations have internal APIs, SaaS platforms, or services that don't have dedicated Terraform providers. This provider fills that gap by:
 
-To install the Generic REST Provider, add the following configuration to your Terraform file:
+- **Eliminating manual API management** - No more curl scripts or custom tooling
+- **Providing real infrastructure as code** - REST resources get the same lifecycle management as your servers
+- **Enabling drift detection** - Automatically detect when someone changes things outside of Terraform
+- **Supporting complex workflows** - Chain API calls, use outputs from one resource in another
+
+## Real-world examples
+
+- **User Management**: Create users in your company's identity system
+- **Configuration Management**: Deploy application settings to microservices
+- **Monitoring Setup**: Configure alerts and dashboards in observability platforms
+- **CI/CD Integration**: Manage build configurations and deployment settings
+- **Third-party Integrations**: Set up webhooks, API keys, and service configurations
+
+## Key Features
+
+### **Complete Resource Lifecycle**
+Create, read, update, and delete REST resources with full Terraform state management. Your API resources get the same `terraform plan`, `terraform apply`, and `terraform destroy` workflow as any other resource.
+
+### **Flexible Authentication**
+Supports the authentication methods you're already using:
+- **API Tokens**: Bearer tokens, API keys, or custom headers
+- **Certificate Authentication**: Client certificates (mTLS) for secure environments
+- **PKCS12 Bundles**: Enterprise certificate formats
+
+### **Universal HTTP Support**
+Works with any REST API using standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS). If your API follows REST conventions, this provider can manage it.
+
+### **Smart Response Handling**
+Automatically parses JSON responses so you can access individual fields in your Terraform configurations. No more parsing JSON in bash scripts!
+
+### **Production-Ready Features**
+- **Automatic Retries**: Handles temporary network issues and API rate limits
+- **Drift Detection**: Detects when resources change outside Terraform
+- **Import Support**: Bring existing API resources under Terraform management
+- **Error Recovery**: Exponential backoff and configurable retry logic
+
+## Quick Start
+
+### 1. Add the provider to your Terraform configuration
 
 ```hcl
 terraform {
   required_providers {
     rest = {
-      source  = "local/rest"
-      version = "0.1.0"
+      source  = "Mikej81/rest"
+      version = "1.0.5"
     }
   }
 }
 ```
 
-Run the `terraform init` command to download and install the provider.
+### 2. Initialize Terraform
+
+```bash
+terraform init
+```
+
+### 3. Configure the provider
+
+```hcl
+provider "rest" {
+  api_url = "https://api.example.com"
+  # Add authentication (see examples below)
+}
+```
+
+### 4. Create your first resource
+
+```hcl
+resource "rest_resource" "my_user" {
+  name     = "john-doe"
+  endpoint = "/users"
+  body = jsonencode({
+    name  = "John Doe"
+    email = "john@example.com"
+  })
+}
+```
+
+### 5. Apply your configuration
+
+```bash
+terraform plan
+terraform apply
+```
+
+That's it! Your REST resource is now managed by Terraform.
 
 ## Provider Configuration
 

@@ -7,7 +7,9 @@ description: |-
 
 # rest_data (Data Source)
 
-The `rest_data` data source enables retrieval of data from REST API endpoints with full HTTP method support, custom headers, query parameters, and automatic JSON response parsing.
+The `rest_data` data source lets you fetch information from REST APIs and use it in your Terraform configuration. Unlike resources, data sources don't create or manage anything - they just read existing data from your API.
+
+**When to use this**: When you need to look up existing information from your API (like user IDs, configuration values, or system status) to use in your Terraform configuration.
 
 ## Features
 
