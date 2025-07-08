@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       version: ${{ steps.version.outputs.version }}
+      config_file: ${{ steps.config.outputs.config_file }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,6 +109,17 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
+      - name: Select GoReleaser config
+        id: config
+        run: |
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
+            echo "Using unsigned release config"
+          else
+            echo "config_file=.goreleaser.v2.yml" >> $GITHUB_OUTPUT  
+            echo "Using signed release config"
+          fi
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -132,7 +144,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --skip-sign --clean --config .goreleaser.v2.yml
+          args: release --snapshot --clean --config ${{ needs.validate.outputs.config_file || '.goreleaser.v2.yml' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
@@ -143,11 +155,10 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --config .goreleaser.v2.yml ${{ env.GPG_PRIVATE_KEY == '' && '--skip-sign' || '' }}
+          args: release --clean --config ${{ needs.validate.outputs.config_file || '.goreleaser.v2.yml' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Upload release artifacts
         if: github.event.inputs.dry_run != 'true'
