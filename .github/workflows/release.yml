@@ -100,19 +100,19 @@ jobs:
           check-latest: true
 
       - name: Import GPG key
-        if: env.GPG_KEY != ''
+        if: env.GPG_PRIVATE_KEY != ''
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
         with:
-          gpg_private_key: ${{ secrets.GPG_KEY }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
         env:
-          GPG_KEY: ${{ secrets.GPG_KEY }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Select GoReleaser config
         id: config
         run: |
-          if [ -z "${{ secrets.GPG_KEY }}" ]; then
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
             echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
             echo "Using unsigned release config"
           else
@@ -145,7 +145,7 @@ jobs:
       - name: Select release config
         id: release_config
         run: |
-          if [ -z "${{ secrets.GPG_KEY }}" ]; then
+          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
             echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
             echo "Using unsigned release config"
           else
