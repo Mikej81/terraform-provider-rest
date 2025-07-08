@@ -149,6 +149,15 @@ jobs:
             echo "Using signed release config"
           fi
 
+      - name: Configure GPG for non-interactive use
+        if: env.GPG_PRIVATE_KEY != ''
+        run: |
+          export GPG_TTY=$(tty)
+          echo "GPG_TTY=$(tty)" >> $GITHUB_ENV
+          gpg --batch --yes --pinentry-mode loopback --list-secret-keys
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
       - name: Run GoReleaser (Dry Run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         uses: goreleaser/goreleaser-action@v6
@@ -159,6 +168,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_TTY: ${{ env.GPG_TTY }}
 
       - name: Run GoReleaser (Release)
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
@@ -170,6 +180,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_TTY: ${{ env.GPG_TTY }}
 
       - name: Upload release artifacts
         if: github.event.inputs.dry_run != 'true'
