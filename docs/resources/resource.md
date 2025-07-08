@@ -223,11 +223,36 @@ resource "rest_resource" "existing_user" {
 
 ### Optional Settings
 
-**`method`** (String)
+**`method`** (String) - DEPRECATED
 
 - HTTP method for creating the resource
 - Default: `"POST"`
 - Common values: `"POST"`, `"PUT"`, `"PATCH"`
+- **Deprecated**: Use `create_method`, `read_method`, `update_method`, `delete_method` instead
+
+**`create_method`** (String)
+
+- HTTP method for create operations
+- Default: `"POST"`
+- Supported values: `"POST"`, `"PUT"`, `"PATCH"`
+
+**`read_method`** (String)
+
+- HTTP method for read operations
+- Default: `"GET"`
+- Supported values: `"GET"`, `"POST"`, `"HEAD"`
+
+**`update_method`** (String)
+
+- HTTP method for update operations
+- Default: `"PUT"`
+- Supported values: `"PUT"`, `"PATCH"`, `"POST"`
+
+**`delete_method`** (String)
+
+- HTTP method for delete operations
+- Default: `"DELETE"`
+- Supported values: `"DELETE"`, `"POST"`, `"PUT"`
 
 **`headers`** (Map of String)
 
@@ -567,31 +592,97 @@ resource "rest_resource" "key" {
 
 ### **Handling Different HTTP Methods**
 
+**New Method Configuration (Recommended):**
+
 ```terraform
-# Most APIs use POST for creation
+# Full control over HTTP methods for each operation
+resource "rest_resource" "api_with_custom_methods" {
+  name     = "my-resource"
+  endpoint = "/resources"
+  
+  # Specify method for each CRUD operation
+  create_method = "POST"    # Create with POST
+  read_method   = "POST"    # Read with POST (for search APIs)
+  update_method = "PATCH"   # Update with PATCH
+  delete_method = "DELETE"  # Delete with DELETE
+  
+  body = jsonencode({
+    data = "value"
+    searchable = true
+  })
+}
+
+# API that uses POST for everything
+resource "rest_resource" "post_only_api" {
+  name     = "my-resource"
+  endpoint = "/api/operations"
+  
+  create_method = "POST"
+  read_method   = "POST"
+  update_method = "POST"
+  delete_method = "POST"
+  
+  body = jsonencode({action = "create", data = "value"})
+  update_body = jsonencode({action = "update", data = "value"})
+  destroy_body = jsonencode({action = "delete"})
+}
+
+# API with mixed methods
+resource "rest_resource" "mixed_methods" {
+  name     = "config-item"
+  endpoint = "/configurations"
+  
+  create_method = "PUT"     # Some APIs use PUT for idempotent creation
+  read_method   = "GET"     # Standard GET for reading
+  update_method = "PATCH"   # PATCH for partial updates
+  delete_method = "POST"    # Some APIs use POST for soft delete
+  
+  body = jsonencode({config = "value"})
+  destroy_body = jsonencode({soft_delete = true})
+}
+```
+
+**Legacy Method Configuration (Backward Compatible):**
+
+```terraform
+# Most APIs use POST for creation (legacy method field)
 resource "rest_resource" "post_example" {
   name     = "my-resource"
   endpoint = "/resources"
-  method   = "POST"  # Default
+  method   = "POST"  # Only affects create operation
   body     = jsonencode({data = "value"})
 }
 
-# Some APIs use PUT for creation
+# Some APIs use PUT for creation (legacy method field)
 resource "rest_resource" "put_example" {
   name     = "my-resource"
   endpoint = "/resources"
-  method   = "PUT"
-  body     = jsonencode({data = "value"})
-}
-
-# PATCH for partial updates
-resource "rest_resource" "patch_example" {
-  name     = "my-resource"
-  endpoint = "/resources"
-  method   = "PATCH"
+  method   = "PUT"   # Only affects create operation
   body     = jsonencode({data = "value"})
 }
 ```
+
+**When to Use Which Methods:**
+
+- **Create Methods**:
+  - `POST`: Most common, creates new resources
+  - `PUT`: Idempotent creation, often with client-provided IDs
+  - `PATCH`: Rare, for APIs that treat creation as a partial update
+
+- **Read Methods**:
+  - `GET`: Standard for most APIs
+  - `POST`: Search APIs, complex queries, APIs with request bodies
+  - `HEAD`: When you only need to check existence
+
+- **Update Methods**:
+  - `PUT`: Full resource replacement
+  - `PATCH`: Partial updates (most common)
+  - `POST`: Some APIs use POST for all operations
+
+- **Delete Methods**:
+  - `DELETE`: Standard HTTP method for deletion
+  - `POST`: Soft deletes, APIs using POST for all operations
+  - `PUT`: Rare, for APIs that mark resources as deleted
 
 ### **Error Handling**
 

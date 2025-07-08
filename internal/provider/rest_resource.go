@@ -39,6 +39,10 @@ type RestResourceModel struct {
 	Endpoint        types.String            `tfsdk:"endpoint"`
 	Name            types.String            `tfsdk:"name"`
 	Method          types.String            `tfsdk:"method"`
+	CreateMethod    types.String            `tfsdk:"create_method"`
+	ReadMethod      types.String            `tfsdk:"read_method"`
+	UpdateMethod    types.String            `tfsdk:"update_method"`
+	DeleteMethod    types.String            `tfsdk:"delete_method"`
 	Headers         map[string]types.String `tfsdk:"headers"`
 	QueryParams     map[string]types.String `tfsdk:"query_params"`
 	Body            types.String            `tfsdk:"body"`
@@ -86,11 +90,43 @@ func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Required:            true,
 			},
 			"method": schema.StringAttribute{
+				MarkdownDescription: "The HTTP method to use for create operations (POST, PUT, PATCH). Default: POST. DEPRECATED: Use create_method, read_method, update_method, delete_method instead.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("POST", "PUT", "PATCH"),
+				},
+			},
+			"create_method": schema.StringAttribute{
 				MarkdownDescription: "The HTTP method to use for create operations (POST, PUT, PATCH). Default: POST.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("POST", "PUT", "PATCH"),
+				},
+			},
+			"read_method": schema.StringAttribute{
+				MarkdownDescription: "The HTTP method to use for read operations (GET, POST, HEAD). Default: GET.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("GET", "POST", "HEAD"),
+				},
+			},
+			"update_method": schema.StringAttribute{
+				MarkdownDescription: "The HTTP method to use for update operations (PUT, PATCH, POST). Default: PUT.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("PUT", "PATCH", "POST"),
+				},
+			},
+			"delete_method": schema.StringAttribute{
+				MarkdownDescription: "The HTTP method to use for delete operations (DELETE, POST, PUT). Default: DELETE.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("DELETE", "POST", "PUT"),
 				},
 			},
 			"headers": schema.MapAttribute{
@@ -435,12 +471,14 @@ func (r *RestResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	// Default method to POST if not provided
-	method := "POST"
-	if !data.Method.IsNull() {
-		method = data.Method.ValueString()
+	// Resolve the HTTP method for create operation
+	method := r.resolveMethodForOperation(&data, "create")
+
+	// Set computed values for backward compatibility and visibility
+	data.CreateMethod = types.StringValue(method)
+	if data.Method.IsNull() {
+		data.Method = types.StringValue(method)
 	}
-	data.Method = types.StringValue(method)
 
 	// Get request body
 	requestBody := ""
@@ -530,8 +568,14 @@ func (r *RestResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		endpoint = fmt.Sprintf("%s/%s", endpoint, data.Name.ValueString())
 	}
 
-	// Build request options for GET
-	options := r.buildRequestOptions(ctx, &data, "GET", "")
+	// Resolve the HTTP method for read operation
+	method := r.resolveMethodForOperation(&data, "read")
+
+	// Set computed value for visibility
+	data.ReadMethod = types.StringValue(method)
+
+	// Build request options with resolved method
+	options := r.buildRequestOptions(ctx, &data, method, "")
 	// Override endpoint for read operation (with name appended)
 	options.Endpoint = endpoint
 
@@ -604,11 +648,11 @@ func (r *RestResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		endpoint = fmt.Sprintf("%s/%s", endpoint, data.Name.ValueString())
 	}
 
-	// Determine update method - prefer PUT, but allow PATCH
-	method := "PUT"
-	if !data.Method.IsNull() && data.Method.ValueString() == "PATCH" {
-		method = "PATCH"
-	}
+	// Resolve the HTTP method for update operation
+	method := r.resolveMethodForOperation(&data, "update")
+
+	// Set computed value for visibility
+	data.UpdateMethod = types.StringValue(method)
 
 	// Get update body - prefer update_body, fallback to body
 	requestBody := ""
@@ -749,9 +793,15 @@ func (r *RestResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		requestBody = data.DestroyBody.ValueString()
 	}
 
+	// Resolve the HTTP method for delete operation
+	method := r.resolveMethodForOperation(&data, "delete")
+
+	// Set computed value for visibility
+	data.DeleteMethod = types.StringValue(method)
+
 	// Build request options
 	options := client.RequestOptions{
-		Method:   "DELETE",
+		Method:   method,
 		Endpoint: endpoint,
 	}
 
@@ -1028,4 +1078,63 @@ func (r *RestResource) valuesEqual(a, b interface{}) bool {
 
 	// Direct comparison for other types
 	return a == b
+}
+
+// resolveMethodForOperation determines the HTTP method to use for a given operation
+// Supports backward compatibility with the legacy 'method' field
+func (r *RestResource) resolveMethodForOperation(data *RestResourceModel, operation string) string {
+	switch operation {
+	case "create":
+		if !data.CreateMethod.IsNull() && !data.CreateMethod.IsUnknown() {
+			return data.CreateMethod.ValueString()
+		}
+		// Backward compatibility: use legacy method field for create
+		if !data.Method.IsNull() && !data.Method.IsUnknown() {
+			return data.Method.ValueString()
+		}
+		return "POST" // Default for create
+
+	case "read":
+		if !data.ReadMethod.IsNull() && !data.ReadMethod.IsUnknown() {
+			return data.ReadMethod.ValueString()
+		}
+		// Backward compatibility: some APIs might use the same method for all operations
+		if !data.Method.IsNull() && !data.Method.IsUnknown() {
+			method := data.Method.ValueString()
+			// Only use legacy method for read if it's a valid read method
+			if method == "GET" || method == "POST" || method == "HEAD" {
+				return method
+			}
+		}
+		return "GET" // Default for read
+
+	case "update":
+		if !data.UpdateMethod.IsNull() && !data.UpdateMethod.IsUnknown() {
+			return data.UpdateMethod.ValueString()
+		}
+		// Backward compatibility: use PATCH if legacy method was PATCH, otherwise PUT
+		if !data.Method.IsNull() && !data.Method.IsUnknown() {
+			method := data.Method.ValueString()
+			if method == "PATCH" {
+				return "PATCH"
+			}
+		}
+		return "PUT" // Default for update
+
+	case "delete":
+		if !data.DeleteMethod.IsNull() && !data.DeleteMethod.IsUnknown() {
+			return data.DeleteMethod.ValueString()
+		}
+		// Backward compatibility: use legacy method if it's a valid delete method
+		if !data.Method.IsNull() && !data.Method.IsUnknown() {
+			method := data.Method.ValueString()
+			if method == "DELETE" || method == "POST" || method == "PUT" {
+				return method
+			}
+		}
+		return "DELETE" // Default for delete
+
+	default:
+		return "GET" // Safe default
+	}
 }
