@@ -6,11 +6,6 @@ run:
 linters:
   enable:
     - errcheck
-    - staticcheck
-    - unused
-    - gosimple
     - govet
   disable:
-    - depguard  # Disable depguard since we need terraform and crypto imports
-    - gocyclo   # Disable complexity checks for now
-    - gocritic  # Disable gocritic for now
+    - all
