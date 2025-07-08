@@ -3,23 +3,26 @@
 package provider
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"terraform-provider-rest/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &RestResource{}
+var _ resource.ResourceWithImportState = &RestResource{}
 
 func NewRestResource() resource.Resource {
 	return &RestResource{}
@@ -27,24 +30,29 @@ func NewRestResource() resource.Resource {
 
 // RestResource defines the resource implementation.
 type RestResource struct {
-	client  *http.Client
-	baseURL string
-	token   string
-	header  string
+	client *client.RestClient
 }
 
 // RestResourceModel describes the resource data model.
 type RestResourceModel struct {
-	Id            types.String `tfsdk:"id"`
-	Endpoint      types.String `tfsdk:"endpoint"`
-	Name          types.String `tfsdk:"name"`
-	Response      types.String `tfsdk:"response"`
-	StatusCode    types.Int64  `tfsdk:"status_code"`
-	Body          types.String `tfsdk:"body"`
-	DestroyBody   types.String `tfsdk:"destroy_body"`
-	Timeout       types.Int64  `tfsdk:"timeout"`
-	Insecure      types.Bool   `tfsdk:"insecure"`
-	RetryAttempts types.Int64  `tfsdk:"retry_attempts"`
+	Id              types.String            `tfsdk:"id"`
+	Endpoint        types.String            `tfsdk:"endpoint"`
+	Name            types.String            `tfsdk:"name"`
+	Method          types.String            `tfsdk:"method"`
+	Headers         map[string]types.String `tfsdk:"headers"`
+	QueryParams     map[string]types.String `tfsdk:"query_params"`
+	Body            types.String            `tfsdk:"body"`
+	UpdateBody      types.String            `tfsdk:"update_body"`
+	DestroyBody     types.String            `tfsdk:"destroy_body"`
+	Response        types.String            `tfsdk:"response"`
+	StatusCode      types.Int64             `tfsdk:"status_code"`
+	ResponseHeaders types.Map `tfsdk:"response_headers"`
+	ResponseData    types.Map `tfsdk:"response_data"`
+	CreatedAt       types.String            `tfsdk:"created_at"`
+	LastUpdated     types.String            `tfsdk:"last_updated"`
+	Timeout         types.Int64             `tfsdk:"timeout"`
+	Insecure        types.Bool              `tfsdk:"insecure"`
+	RetryAttempts   types.Int64             `tfsdk:"retry_attempts"`
 }
 
 func (r *RestResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -53,7 +61,7 @@ func (r *RestResource) Metadata(ctx context.Context, req resource.MetadataReques
 
 func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "REST resource to create, read, update, and delete items via API.",
+		MarkdownDescription: "REST resource to create, read, update, and delete items via API with full HTTP method support.",
 
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
@@ -65,27 +73,67 @@ func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Computed:            true,
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the item to be used for identification during update and delete operations.",
+				MarkdownDescription: "The name of the item to be used for identification during read, update and delete operations.",
 				Required:            true,
 			},
+			"method": schema.StringAttribute{
+				MarkdownDescription: "The HTTP method to use for create operations (POST, PUT, PATCH). Default: POST.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("POST", "PUT", "PATCH"),
+				},
+			},
+			"headers": schema.MapAttribute{
+				MarkdownDescription: "Custom headers to include in requests.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
+			"query_params": schema.MapAttribute{
+				MarkdownDescription: "Query parameters to include in requests.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
 			"body": schema.StringAttribute{
-				MarkdownDescription: "The body for the request. This can be a JSON object or any payload that the API expects.",
+				MarkdownDescription: "The body for create requests. This can be a JSON object or any payload that the API expects.",
+				Optional:            true,
+			},
+			"update_body": schema.StringAttribute{
+				MarkdownDescription: "The body for update requests. If not specified, uses the same body as create.",
 				Optional:            true,
 			},
 			"destroy_body": schema.StringAttribute{
-				MarkdownDescription: "The body for the destroy. This can be a JSON object or any payload that the API expects.",
+				MarkdownDescription: "The body for delete requests. This can be a JSON object or any payload that the API expects.",
 				Optional:            true,
 			},
 			"response": schema.StringAttribute{
-				MarkdownDescription: "The response from the API request.",
+				MarkdownDescription: "The response from the most recent API request.",
 				Computed:            true,
 			},
 			"status_code": schema.Int64Attribute{
-				MarkdownDescription: "The HTTP status code from the API request.",
+				MarkdownDescription: "The HTTP status code from the most recent API request.",
+				Computed:            true,
+			},
+			"response_headers": schema.MapAttribute{
+				MarkdownDescription: "The response headers from the API request.",
+				Computed:            true,
+				ElementType:         types.StringType,
+			},
+			"response_data": schema.MapAttribute{
+				MarkdownDescription: "The parsed response data as key-value pairs (for JSON responses).",
+				Computed:            true,
+				ElementType:         types.StringType,
+			},
+			"created_at": schema.StringAttribute{
+				MarkdownDescription: "Timestamp when the resource was created.",
+				Computed:            true,
+			},
+			"last_updated": schema.StringAttribute{
+				MarkdownDescription: "Timestamp when the resource was last updated.",
 				Computed:            true,
 			},
 			"timeout": schema.Int64Attribute{
-				MarkdownDescription: "Timeout for the request in seconds.",
+				MarkdownDescription: "Timeout for requests in seconds.",
 				Optional:            true,
 			},
 			"insecure": schema.BoolAttribute{
@@ -93,7 +141,7 @@ func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Optional:            true,
 			},
 			"retry_attempts": schema.Int64Attribute{
-				MarkdownDescription: "Number of retry attempts for the request.",
+				MarkdownDescription: "Number of retry attempts for failed requests.",
 				Optional:            true,
 			},
 		},
@@ -105,436 +153,538 @@ func (r *RestResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	apiClient, ok := req.ProviderData.(*APIClient)
+	providerData, ok := req.ProviderData.(*ProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *APIClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *ProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = &http.Client{}
-	r.baseURL = apiClient.BaseURL
-	r.token = apiClient.Token
-	r.header = apiClient.Header
+	r.client = providerData.Client
 }
 
-// Working, commenting out to test new mods
-// func (r *RestResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-// 	var data RestResourceModel
+// buildRequestOptions creates client.RequestOptions from resource model
+func (r *RestResource) buildRequestOptions(ctx context.Context, data *RestResourceModel, method string, body string) client.RequestOptions {
+	options := client.RequestOptions{
+		Method:   method,
+		Endpoint: data.Endpoint.ValueString(),
+	}
 
-// 	// Read the planned state (attributes from HCL)
-// 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-// 	if resp.Diagnostics.HasError() {
-// 		return
-// 	}
+	// Add body if provided
+	if body != "" {
+		options.Body = []byte(body)
+	}
 
-// 	// Build the full URL using baseURL and endpoint provided by the user
-// 	reqURL := fmt.Sprintf("%s%s", r.baseURL, data.Endpoint.ValueString())
+	// Add custom headers
+	if data.Headers != nil {
+		customHeaders := make(map[string]string)
+		for key, value := range data.Headers {
+			customHeaders[key] = value.ValueString()
+		}
+		options.Headers = customHeaders
+	}
 
-// 	// Use the `Body` value from the plan
-// 	requestBody := data.Body.ValueString()
-// 	if requestBody == "" {
-// 		requestBody = "{}" // Default to empty JSON object if no body is provided
-// 	}
+	// Add query parameters
+	if data.QueryParams != nil {
+		queryParams := make(map[string]string)
+		for key, value := range data.QueryParams {
+			queryParams[key] = value.ValueString()
+		}
+		options.QueryParams = queryParams
+	}
 
-// 	tflog.Trace(ctx, "tried to create a REST resource", map[string]interface{}{
-// 		"endpoint":    reqURL,
-// 		"requestBody": requestBody,
-// 	})
+	// Set timeout if provided
+	if !data.Timeout.IsNull() {
+		options.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	}
 
-// 	// Create the HTTP POST request
-// 	httpReq, err := http.NewRequest("POST", reqURL, bytes.NewBuffer([]byte(requestBody)))
-// 	if err != nil {
-// 		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
-// 		return
-// 	}
+	// Set retry attempts if provided
+	if !data.RetryAttempts.IsNull() {
+		options.Retries = int(data.RetryAttempts.ValueInt64())
+	}
 
-// 	// Set headers
-// 	httpReq.Header.Set(r.header, r.token)
-// 	httpReq.Header.Set("Content-Type", "application/json")
+	return options
+}
 
-// 	// Send the HTTP request
-// 	httpResp, err := r.client.Do(httpReq)
-// 	if err != nil {
-// 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send POST request: %s", err))
-// 		return
-// 	}
-// 	defer httpResp.Body.Close()
+// processResponse handles the HTTP response and updates the model
+func (r *RestResource) processResponse(ctx context.Context, response *client.Response, data *RestResourceModel) error {
+	// Set response data
+	data.StatusCode = types.Int64Value(int64(response.StatusCode))
+	data.Response = types.StringValue(string(response.Body))
 
-// 	// Read the response body
-// 	body, err := ioutil.ReadAll(httpResp.Body)
-// 	if err != nil {
-// 		resp.Diagnostics.AddError("Read Error", fmt.Sprintf("Unable to read response body: %s", err))
-// 		return
-// 	}
+	// Set response headers
+	responseHeaders := make(map[string]attr.Value)
+	for key, values := range response.Headers {
+		if len(values) > 0 {
+			responseHeaders[key] = types.StringValue(values[0])
+		}
+	}
+	headersMap, diags := types.MapValue(types.StringType, responseHeaders)
+	if diags.HasError() {
+		tflog.Warn(ctx, "failed to create response headers map", map[string]interface{}{
+			"errors": diags.Errors(),
+		})
+		data.ResponseHeaders = types.MapNull(types.StringType)
+	} else {
+		data.ResponseHeaders = headersMap
+	}
 
-// 	// Set the HTTP status code in the resource state
-// 	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
+	// Parse JSON response data for dynamic output
+	responseData := make(map[string]attr.Value)
+	if len(response.Body) > 0 {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(response.Body, &parsed); err == nil {
+			for key, value := range parsed {
+				// Convert all values to strings for simplicity
+				if value != nil {
+					switch v := value.(type) {
+					case string:
+						responseData[key] = types.StringValue(v)
+					case float64:
+						responseData[key] = types.StringValue(fmt.Sprintf("%.0f", v))
+					case bool:
+						responseData[key] = types.StringValue(fmt.Sprintf("%t", v))
+					default:
+						// Convert complex types to JSON string
+						if jsonBytes, err := json.Marshal(value); err == nil {
+							responseData[key] = types.StringValue(string(jsonBytes))
+						}
+					}
+				}
+			}
+		}
+	}
+	dataMap, diags := types.MapValue(types.StringType, responseData)
+	if diags.HasError() {
+		tflog.Warn(ctx, "failed to create response data map", map[string]interface{}{
+			"errors": diags.Errors(),
+		})
+		data.ResponseData = types.MapNull(types.StringType)
+	} else {
+		data.ResponseData = dataMap
+	}
 
-// 	// Check if the response is successful
-// 	if httpResp.StatusCode != http.StatusCreated && httpResp.StatusCode != http.StatusOK {
-// 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Received non-success response code: %d, Response: %s", httpResp.StatusCode, string(body)))
-// 		return
-// 	}
+	// Set timestamps
+	currentTime := time.Now().UTC().Format(time.RFC3339)
+	if data.CreatedAt.IsNull() || data.CreatedAt.IsUnknown() {
+		data.CreatedAt = types.StringValue(currentTime)
+	}
+	data.LastUpdated = types.StringValue(currentTime)
 
-// 	// Save the full response body
-// 	data.Response = types.StringValue(string(body))
+	// Extract ID from response if it exists and it's not already set
+	if data.Id.IsNull() || data.Id.IsUnknown() {
+		if len(response.Body) > 0 {
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(response.Body, &parsed); err == nil {
+				if idValue, ok := parsed["id"].(string); ok {
+					data.Id = types.StringValue(idValue)
+					tflog.Debug(ctx, "extracted ID from response", map[string]interface{}{
+						"id": idValue,
+					})
+					return nil
+				}
+			}
+		}
 
-// 	// Extract `id` from response if it exists
-// 	var parsed map[string]interface{}
-// 	if err := json.Unmarshal(body, &parsed); err == nil {
-// 		if idValue, ok := parsed["id"].(string); ok {
-// 			data.Id = types.StringValue(idValue)
-// 		} else {
-// 			data.Id = types.StringValue(reqURL) // Fallback to request URL as ID
-// 		}
-// 	} else {
-// 		data.Id = types.StringValue(reqURL) // Fallback to request URL as ID if parsing fails
-// 	}
+		// Fallback ID generation only if no ID was found in response
+		fallbackId := fmt.Sprintf("%s_%s", data.Endpoint.ValueString(), data.Name.ValueString())
+		data.Id = types.StringValue(fallbackId)
+		tflog.Debug(ctx, "generated fallback ID", map[string]interface{}{
+			"id": fallbackId,
+		})
+	}
 
-// 	// Write logs using the tflog package
-// 	tflog.Trace(ctx, "created a REST resource", map[string]interface{}{
-// 		"endpoint":    reqURL,
-// 		"status_code": httpResp.StatusCode,
-// 	})
-
-// 	// Save the resource state
-// 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-// }
+	return nil
+}
 
 func (r *RestResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data RestResourceModel
 
-	// Read the planned state (attributes from HCL)
+	// Read the planned state
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Build the full URL using baseURL and endpoint provided by the user
-	reqURL := fmt.Sprintf("%s%s", r.baseURL, data.Endpoint.ValueString())
+	// Default method to POST if not provided
+	method := "POST"
+	if !data.Method.IsNull() {
+		method = data.Method.ValueString()
+	}
+	data.Method = types.StringValue(method)
 
-	// Use the `Body` value from the plan
-	requestBody := data.Body.ValueString()
-	if requestBody == "" {
-		requestBody = "{}" // Default to empty JSON object if no body is provided
+	// Get request body
+	requestBody := ""
+	if !data.Body.IsNull() {
+		requestBody = data.Body.ValueString()
 	}
 
-	tflog.Trace(ctx, "tried to create a REST resource", map[string]interface{}{
-		"endpoint":    reqURL,
-		"requestBody": requestBody,
+	// Build request options
+	options := r.buildRequestOptions(ctx, &data, method, requestBody)
+
+	tflog.Trace(ctx, "creating REST resource", map[string]interface{}{
+		"method":   method,
+		"endpoint": data.Endpoint.ValueString(),
 	})
 
-	// Configure HTTP client with timeout and insecure options
-	client := &http.Client{}
-	if !data.Timeout.IsNull() {
-		client.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
-	}
-	if !data.Insecure.IsNull() && data.Insecure.ValueBool() {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client.Transport = transport
-	}
-
-	// Create the HTTP POST request
-	httpReq, err := http.NewRequest("POST", reqURL, bytes.NewBuffer([]byte(requestBody)))
+	// Make the request
+	response, err := r.client.Do(ctx, options)
 	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
+		resp.Diagnostics.AddError(
+			"HTTP Request Failed",
+			fmt.Sprintf("Unable to send %s request to %s: %s", method, data.Endpoint.ValueString(), err),
+		)
 		return
 	}
 
-	// Set headers
-	httpReq.Header.Set(r.header, r.token)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Retry logic
-	retryAttempts := 1
-	if !data.RetryAttempts.IsNull() {
-		retryAttempts = int(data.RetryAttempts.ValueInt64())
-	}
-
-	var httpResp *http.Response
-	for i := 0; i < retryAttempts; i++ {
-		httpResp, err = client.Do(httpReq)
-		if err == nil {
-			break
-		}
-		tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", i+1, err))
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send POST request: %s", err))
-		return
-	}
-	defer httpResp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		resp.Diagnostics.AddError("Read Error", fmt.Sprintf("Unable to read response body: %s", err))
+	// Check for successful status codes
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		resp.Diagnostics.AddError(
+			"API Error",
+			fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+		)
 		return
 	}
 
-	// Set the HTTP status code in the resource state
-	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
-
-	// Check if the response is successful
-	if httpResp.StatusCode != http.StatusCreated && httpResp.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Received non-success response code: %d, Response: %s", httpResp.StatusCode, string(body)))
+	// Process response
+	if err := r.processResponse(ctx, response, &data); err != nil {
+		resp.Diagnostics.AddError("Response Processing Error", err.Error())
 		return
 	}
 
-	// Save the full response body
-	data.Response = types.StringValue(string(body))
-
-	// Extract `id` from response if it exists
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(body, &parsed); err == nil {
-		if idValue, ok := parsed["id"].(string); ok {
-			data.Id = types.StringValue(idValue)
-		} else {
-			data.Id = types.StringValue(reqURL) // Fallback to request URL as ID
-		}
-	} else {
-		data.Id = types.StringValue(reqURL) // Fallback to request URL as ID if parsing fails
-	}
-
-	// Write logs using the tflog package
-	tflog.Trace(ctx, "created a REST resource", map[string]interface{}{
-		"endpoint":    reqURL,
-		"status_code": httpResp.StatusCode,
+	tflog.Trace(ctx, "created REST resource", map[string]interface{}{
+		"method":      method,
+		"endpoint":    data.Endpoint.ValueString(),
+		"status_code": response.StatusCode,
+		"id":          data.Id.ValueString(),
 	})
 
 	// Save the resource state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...) // Write the data to state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *RestResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data RestResourceModel
 
-	// Debugging: Log state retrieval
+	// Read current state
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
-		resp.Diagnostics.AddError("State Retrieval Error", "Error while retrieving state")
 		return
 	}
 
-	// Construct the URL using baseURL, endpoint, and object name
-	url := fmt.Sprintf("%s%s/%s", r.baseURL, data.Endpoint.ValueString(), data.Name.ValueString())
-
-	// Configure HTTP client with timeout and insecure options
-	client := &http.Client{}
-	if !data.Timeout.IsNull() {
-		client.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	// Build URL for GET request - typically append name to endpoint
+	endpoint := data.Endpoint.ValueString()
+	if !data.Name.IsNull() {
+		endpoint = fmt.Sprintf("%s/%s", endpoint, data.Name.ValueString())
 	}
-	if !data.Insecure.IsNull() && data.Insecure.ValueBool() {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+
+	// Build request options for GET
+	options := r.buildRequestOptions(ctx, &data, "GET", "")
+	// Override endpoint for read operation (with name appended)
+	options.Endpoint = endpoint
+
+	tflog.Trace(ctx, "reading REST resource", map[string]interface{}{
+		"endpoint": endpoint,
+		"id":       data.Id.ValueString(),
+	})
+
+	// Make the request
+	response, err := r.client.Do(ctx, options)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"HTTP Request Failed",
+			fmt.Sprintf("Unable to send GET request to %s: %s", endpoint, err),
+		)
+		return
+	}
+
+	// Handle 404 as resource not found
+	if response.StatusCode == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	// Check for other success status codes
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		resp.Diagnostics.AddError(
+			"API Error",
+			fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+		)
+		return
+	}
+
+	// Process the response using the same logic as Create/Update
+	if err := r.processResponse(ctx, response, &data); err != nil {
+		resp.Diagnostics.AddError("Response Processing Error", err.Error())
+		return
+	}
+
+	// Check for drift in the response body if we have an expected structure
+	if len(response.Body) > 0 {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(response.Body, &parsed); err == nil {
+			// Check if the resource still exists by verifying it has the expected ID
+			if currentId, ok := parsed["id"].(string); ok {
+				expectedId := data.Id.ValueString()
+				if currentId != expectedId {
+					tflog.Warn(ctx, "detected ID drift", map[string]interface{}{
+						"expected_id": expectedId,
+						"current_id":  currentId,
+					})
+					// Update the ID to match what's on the server
+					data.Id = types.StringValue(currentId)
+				}
+			}
 		}
-		client.Transport = transport
 	}
 
-	httpReq, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
-		resp.Diagnostics.AddWarning("Debug URL", fmt.Sprintf("Attempted URL: %s", url))
-		return
-	}
+	tflog.Trace(ctx, "read REST resource", map[string]interface{}{
+		"endpoint":    endpoint,
+		"status_code": response.StatusCode,
+		"id":          data.Id.ValueString(),
+	})
 
-	httpReq.Header.Set(r.header, r.token)
-
-	// Retry logic
-	retryAttempts := 1
-	if !data.RetryAttempts.IsNull() {
-		retryAttempts = int(data.RetryAttempts.ValueInt64())
-	}
-
-	var httpResp *http.Response
-	for i := 0; i < retryAttempts; i++ {
-		httpResp, err = client.Do(httpReq)
-		if err == nil {
-			break
-		}
-		tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", i+1, err))
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send GET request: %s", err))
-		return
-	}
-	defer httpResp.Body.Close()
-
-	// Set the status code in the response model
-	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
-
-	if httpResp.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Received non-200 response code: %d", httpResp.StatusCode))
-		return
-	}
-
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		resp.Diagnostics.AddError("Read Error", fmt.Sprintf("Unable to read response body: %s", err))
-		return
-	}
-
-	data.Response = types.StringValue(string(body))
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...) // Save the read data back into the state
+	// Save updated state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *RestResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data RestResourceModel
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...) // Read Terraform plan data
+	// Read the plan
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Build the full URL using baseURL and endpoint provided by the user
-	reqURL := fmt.Sprintf("%s%s/%s", r.baseURL, data.Endpoint.ValueString(), data.Name.ValueString())
-
-	// Use the `Body` value from the plan
-	requestBody := data.Body.ValueString()
-	if requestBody == "" {
-		requestBody = "{}" // Default to empty JSON object if no body is provided
+	// Build URL for PUT/PATCH request - typically append name to endpoint
+	endpoint := data.Endpoint.ValueString()
+	if !data.Name.IsNull() {
+		endpoint = fmt.Sprintf("%s/%s", endpoint, data.Name.ValueString())
 	}
 
-	// Configure HTTP client with timeout and insecure options
-	client := &http.Client{}
+	// Determine update method - prefer PUT, but allow PATCH
+	method := "PUT"
+	if !data.Method.IsNull() && data.Method.ValueString() == "PATCH" {
+		method = "PATCH"
+	}
+
+	// Get update body - prefer update_body, fallback to body
+	requestBody := ""
+	if !data.UpdateBody.IsNull() {
+		requestBody = data.UpdateBody.ValueString()
+	} else if !data.Body.IsNull() {
+		requestBody = data.Body.ValueString()
+	}
+
+	// Build request options
+	options := client.RequestOptions{
+		Method:   method,
+		Endpoint: endpoint,
+	}
+
+	if requestBody != "" {
+		options.Body = []byte(requestBody)
+	}
+
+	// Add custom headers
+	if data.Headers != nil {
+		customHeaders := make(map[string]string)
+		for key, value := range data.Headers {
+			customHeaders[key] = value.ValueString()
+		}
+		options.Headers = customHeaders
+	}
+
+	// Add query parameters
+	if data.QueryParams != nil {
+		queryParams := make(map[string]string)
+		for key, value := range data.QueryParams {
+			queryParams[key] = value.ValueString()
+		}
+		options.QueryParams = queryParams
+	}
+
+	// Set timeout if provided
 	if !data.Timeout.IsNull() {
-		client.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
-	}
-	if !data.Insecure.IsNull() && data.Insecure.ValueBool() {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client.Transport = transport
+		options.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
 	}
 
-	// Create the HTTP PUT request
-	httpReq, err := http.NewRequest("PUT", reqURL, bytes.NewBuffer([]byte(requestBody)))
-	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
-		return
-	}
-
-	httpReq.Header.Set(r.header, r.token)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Retry logic
-	retryAttempts := 1
+	// Set retry attempts if provided
 	if !data.RetryAttempts.IsNull() {
-		retryAttempts = int(data.RetryAttempts.ValueInt64())
+		options.Retries = int(data.RetryAttempts.ValueInt64())
 	}
 
-	var httpResp *http.Response
-	for i := 0; i < retryAttempts; i++ {
-		httpResp, err = client.Do(httpReq)
-		if err == nil {
-			break
-		}
-		tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", i+1, err))
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send PUT request: %s", err))
-		return
-	}
-	defer httpResp.Body.Close()
-
-	// Set the status code in the response model
-	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
-
-	if httpResp.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Received non-200 response code: %d", httpResp.StatusCode))
-		return
-	}
-
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		resp.Diagnostics.AddError("Read Error", fmt.Sprintf("Unable to read response body: %s", err))
-		return
-	}
-
-	data.Response = types.StringValue(string(body))
-
-	tflog.Trace(ctx, "updated a REST resource", map[string]interface{}{
-		"id": data.Id.ValueString(),
+	tflog.Trace(ctx, "updating REST resource", map[string]interface{}{
+		"method":   method,
+		"endpoint": endpoint,
+		"id":       data.Id.ValueString(),
 	})
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...) // Save updated data into Terraform state
+	// Make the request
+	response, err := r.client.Do(ctx, options)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"HTTP Request Failed",
+			fmt.Sprintf("Unable to send %s request to %s: %s", method, endpoint, err),
+		)
+		return
+	}
+
+	// Check for successful status codes
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		resp.Diagnostics.AddError(
+			"API Error",
+			fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+		)
+		return
+	}
+
+	// Process response 
+	if err := r.processResponse(ctx, response, &data); err != nil {
+		resp.Diagnostics.AddError("Response Processing Error", err.Error())
+		return
+	}
+
+	tflog.Trace(ctx, "updated REST resource", map[string]interface{}{
+		"method":      method,
+		"endpoint":    endpoint,
+		"status_code": response.StatusCode,
+		"id":          data.Id.ValueString(),
+	})
+
+	// Save updated state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *RestResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// The ID from the import should be in the format "endpoint/name"
+	parts := strings.Split(req.ID, "/")
+	if len(parts) < 2 {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Import ID must be in format 'endpoint/name', got: %s", req.ID),
+		)
+		return
+	}
+
+	// Handle cases where endpoint might contain slashes
+	name := parts[len(parts)-1]
+	endpoint := "/" + strings.Join(parts[:len(parts)-1], "/")
+
+	// Set the basic attributes
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("endpoint"), endpoint)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+
+	// Set default method
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("method"), "POST")...)
+
+	tflog.Trace(ctx, "imported REST resource", map[string]interface{}{
+		"endpoint": endpoint,
+		"name":     name,
+		"id":       req.ID,
+	})
 }
 
 func (r *RestResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data RestResourceModel
 
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...) // Read Terraform prior state data
+	// Read current state
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Build the full URL using baseURL, endpoint, and name provided by the user
-	reqURL := fmt.Sprintf("%s%s/%s", r.baseURL, data.Endpoint.ValueString(), data.Name.ValueString())
-
-	// Use the `DestroyBody` value from the plan
-	destroyRequestBody := data.DestroyBody.ValueString()
-	if destroyRequestBody == "" {
-		destroyRequestBody = "{}" // Default to empty JSON object if no body is provided
+	// Build URL for DELETE request - typically append name to endpoint
+	endpoint := data.Endpoint.ValueString()
+	if !data.Name.IsNull() {
+		endpoint = fmt.Sprintf("%s/%s", endpoint, data.Name.ValueString())
 	}
 
-	// Configure HTTP client with timeout and insecure options
-	client := &http.Client{}
-	if !data.Timeout.IsNull() {
-		client.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	// Get destroy body if provided
+	requestBody := ""
+	if !data.DestroyBody.IsNull() {
+		requestBody = data.DestroyBody.ValueString()
 	}
-	if !data.Insecure.IsNull() && data.Insecure.ValueBool() {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+
+	// Build request options
+	options := client.RequestOptions{
+		Method:   "DELETE",
+		Endpoint: endpoint,
+	}
+
+	if requestBody != "" {
+		options.Body = []byte(requestBody)
+	}
+
+	// Add custom headers
+	if data.Headers != nil {
+		customHeaders := make(map[string]string)
+		for key, value := range data.Headers {
+			customHeaders[key] = value.ValueString()
 		}
-		client.Transport = transport
+		options.Headers = customHeaders
 	}
 
-	httpReq, err := http.NewRequest("DELETE", reqURL, bytes.NewBuffer([]byte(destroyRequestBody)))
+	// Add query parameters
+	if data.QueryParams != nil {
+		queryParams := make(map[string]string)
+		for key, value := range data.QueryParams {
+			queryParams[key] = value.ValueString()
+		}
+		options.QueryParams = queryParams
+	}
+
+	// Set timeout if provided
+	if !data.Timeout.IsNull() {
+		options.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	}
+
+	// Set retry attempts if provided
+	if !data.RetryAttempts.IsNull() {
+		options.Retries = int(data.RetryAttempts.ValueInt64())
+	}
+
+	tflog.Trace(ctx, "deleting REST resource", map[string]interface{}{
+		"endpoint": endpoint,
+		"id":       data.Id.ValueString(),
+	})
+
+	// Make the request
+	response, err := r.client.Do(ctx, options)
 	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
+		resp.Diagnostics.AddError(
+			"HTTP Request Failed",
+			fmt.Sprintf("Unable to send DELETE request to %s: %s", endpoint, err),
+		)
 		return
 	}
 
-	httpReq.Header.Set(r.header, r.token)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Retry logic
-	retryAttempts := 1
-	if !data.RetryAttempts.IsNull() {
-		retryAttempts = int(data.RetryAttempts.ValueInt64())
-	}
-
-	var httpResp *http.Response
-	for i := 0; i < retryAttempts; i++ {
-		httpResp, err = client.Do(httpReq)
-		if err == nil {
+	// Accept 200, 202, 204, and 404 as successful deletion
+	acceptableStatusCodes := []int{200, 202, 204, 404}
+	successful := false
+	for _, code := range acceptableStatusCodes {
+		if response.StatusCode == code {
+			successful = true
 			break
 		}
-		tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", i+1, err))
 	}
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send DELETE request: %s", err))
-		return
-	}
-	defer httpResp.Body.Close()
 
-	// Set the status code in the response model
-	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
-
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Received non-success response code: %d", httpResp.StatusCode))
+	if !successful {
+		resp.Diagnostics.AddError(
+			"API Error",
+			fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+		)
 		return
 	}
 
-	tflog.Trace(ctx, "deleted a REST resource", map[string]interface{}{
-		"name":        data.Name.ValueString(),
-		"status_code": httpResp.StatusCode,
+	tflog.Trace(ctx, "deleted REST resource", map[string]interface{}{
+		"endpoint":    endpoint,
+		"status_code": response.StatusCode,
+		"id":          data.Id.ValueString(),
 	})
 }

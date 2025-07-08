@@ -4,18 +4,17 @@ package provider
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"terraform-provider-rest/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -27,10 +26,7 @@ func NewRestDataSource() datasource.DataSource {
 
 // RestDataSource defines the data source implementation.
 type RestDataSource struct {
-	client  *http.Client
-	baseURL string
-	token   string
-	header  string
+	client *client.RestClient
 }
 
 // RestDataSourceModel describes the data source data model.
@@ -62,9 +58,12 @@ func (d *RestDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				Required:            true,
 			},
 			"method": schema.StringAttribute{
-				MarkdownDescription: "The HTTP method to use (GET, POST, PUT, DELETE).",
+				MarkdownDescription: "The HTTP method to use (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS).",
 				Optional:            true,
 				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"),
+				},
 			},
 			"headers": schema.MapAttribute{
 				MarkdownDescription: "Custom headers to include in the request.",
@@ -114,27 +113,24 @@ func (d *RestDataSource) Configure(ctx context.Context, req datasource.Configure
 		return
 	}
 
-	apiClient, ok := req.ProviderData.(*APIClient)
+	providerData, ok := req.ProviderData.(*ProviderData)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *APIClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *ProviderData, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 		return
 	}
 
-	d.client = &http.Client{}
-	d.baseURL = apiClient.BaseURL
-	d.token = apiClient.Token
-	d.header = apiClient.Header
+	d.client = providerData.Client
 }
 
 func (d *RestDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var data RestDataSourceModel
 
 	// Read Terraform configuration data into the model
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...) // Read the config into data
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -145,103 +141,83 @@ func (d *RestDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		method = data.Method.ValueString()
 	}
 
-	// Build the full URL by combining base URL and endpoint
-	reqURL := fmt.Sprintf("%s%s", d.baseURL, data.Endpoint.ValueString())
-
-	// Create request body if applicable
-	var requestBody *strings.Reader
-	if !data.Body.IsNull() && (method == "POST" || method == "PUT") {
-		requestBody = strings.NewReader(data.Body.ValueString())
-	} else {
-		requestBody = strings.NewReader("")
+	// Prepare request options
+	requestOptions := client.RequestOptions{
+		Method:   method,
+		Endpoint: data.Endpoint.ValueString(),
 	}
 
-	// Configure HTTP client with timeout and insecure options
-	client := &http.Client{}
-	if !data.Timeout.IsNull() {
-		client.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	// Add request body if provided
+	if !data.Body.IsNull() {
+		requestOptions.Body = []byte(data.Body.ValueString())
 	}
-	if !data.Insecure.IsNull() && data.Insecure.ValueBool() {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client.Transport = transport
-	}
-
-	// Make the request to the specified endpoint
-	httpReq, err := http.NewRequest(method, reqURL, requestBody)
-	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Error", fmt.Sprintf("Unable to create request: %s", err))
-		return
-	}
-
-	// Add the default header for authentication
-	httpReq.Header.Set(d.header, d.token)
-	httpReq.Header.Set("Content-Type", "application/json")
 
 	// Add custom headers if provided
 	if data.Headers != nil {
+		customHeaders := make(map[string]string)
 		for key, value := range data.Headers {
-			httpReq.Header.Set(key, value.ValueString())
+			customHeaders[key] = value.ValueString()
 		}
+		requestOptions.Headers = customHeaders
 	}
 
-	// Retry logic
-	retryAttempts := 1
+	// Set timeout if provided
+	if !data.Timeout.IsNull() {
+		requestOptions.Timeout = time.Duration(data.Timeout.ValueInt64()) * time.Second
+	}
+
+	// Set retry attempts if provided
 	if !data.RetryAttempts.IsNull() {
-		retryAttempts = int(data.RetryAttempts.ValueInt64())
+		requestOptions.Retries = int(data.RetryAttempts.ValueInt64())
 	}
 
-	var httpResp *http.Response
-	for i := 0; i < retryAttempts; i++ {
-		httpResp, err = client.Do(httpReq)
-		if err == nil {
-			break
-		}
-		tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", i+1, err))
-	}
+	// Make the request using the REST client
+	response, err := d.client.Do(ctx, requestOptions)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to send %s request: %s", method, err))
-		return
-	}
-	defer httpResp.Body.Close()
-
-	// Set the status code in the response model
-	data.StatusCode = types.Int64Value(int64(httpResp.StatusCode))
-
-	// Read the response body
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		resp.Diagnostics.AddError("Read Error", fmt.Sprintf("Unable to read response body: %s", err))
+		resp.Diagnostics.AddError(
+			"HTTP Request Failed",
+			fmt.Sprintf("Unable to send %s request to %s: %s", method, data.Endpoint.ValueString(), err),
+		)
 		return
 	}
 
-	data.Response = types.StringValue(string(body))
-	data.Id = types.StringValue(reqURL)
+	// Set the status code and response body
+	data.StatusCode = types.Int64Value(int64(response.StatusCode))
+	data.Response = types.StringValue(string(response.Body))
+	data.Id = types.StringValue(fmt.Sprintf("%s_%s", method, data.Endpoint.ValueString()))
+
+	// Set the computed method value
+	data.Method = types.StringValue(method)
 
 	// Parse the JSON response body into dynamic attributes
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		resp.Diagnostics.AddError("Parse Error", fmt.Sprintf("Unable to parse response body as JSON: %s", err))
-		return
-	}
-
-	parsedData := make(map[string]types.String)
-	for key, value := range parsed {
-		if strValue, ok := value.(string); ok {
-			parsedData[key] = types.StringValue(strValue)
+	if len(response.Body) > 0 {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal(response.Body, &parsed); err != nil {
+			// Log the error but don't fail - not all responses are JSON
+			tflog.Debug(ctx, "Response body is not valid JSON", map[string]interface{}{
+				"endpoint": data.Endpoint.ValueString(),
+				"error":    err.Error(),
+			})
 		} else {
-			parsedData[key] = types.StringValue(fmt.Sprintf("%v", value))
+			parsedData := make(map[string]types.String)
+			for key, value := range parsed {
+				if strValue, ok := value.(string); ok {
+					parsedData[key] = types.StringValue(strValue)
+				} else {
+					parsedData[key] = types.StringValue(fmt.Sprintf("%v", value))
+				}
+			}
+			data.ParsedData = parsedData
 		}
 	}
-	data.ParsedData = parsedData
 
 	// Write logs using the tflog package
 	tflog.Trace(ctx, "read a REST data source", map[string]interface{}{
-		"endpoint":    reqURL,
-		"status_code": httpResp.StatusCode,
+		"method":      method,
+		"endpoint":    data.Endpoint.ValueString(),
+		"status_code": response.StatusCode,
 	})
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...) // Write the data to state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

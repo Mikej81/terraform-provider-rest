@@ -1,18 +1,22 @@
-# Generic REST Provider for Terraform
+# Terraform REST Provider
 
 ## Overview
 
-The **Generic REST Provider** for Terraform enables users to interact with REST APIs seamlessly, allowing them to manage resources through simple CRUD operations. This provider is designed to integrate with any REST API, making it easy to automate the creation, reading, updating, and deletion of resources in your infrastructure.
-
-By leveraging the power of Terraform, you can bring your REST-based integrations under infrastructure-as-code management, providing version control, state tracking, and a consistent way to manage your external services.
+The **Terraform REST Provider** enables seamless interaction with REST APIs through Infrastructure as Code. This provider supports comprehensive CRUD operations, multiple authentication methods, and advanced features for managing REST-based resources within your Terraform configurations.
 
 ## Features
 
-- **CRUD Operations**: Provides a unified interface for creating, reading, updating, and deleting resources through REST APIs.
-- **Customizable Requests**: Supports various configuration options such as custom headers, request bodies, and query parameters.
-- **Timeouts and Retries**: Includes customizable request timeouts, retry attempts, and options to skip SSL verification for enhanced flexibility.
-- **Dynamic Resource Handling**: Automatically manage the state of resources to ensure infrastructure consistency and eliminate configuration drift.
-- **Supports Authentication**: Integrate API tokens and headers for secure access to authenticated endpoints.
+- **Complete CRUD Operations**: Create, read, update, and delete resources via REST APIs with full state management
+- **Multiple Authentication Methods**: 
+  - Token-based authentication with configurable headers
+  - Client certificate authentication (mTLS) with PEM format
+  - PKCS12 certificate bundle support
+- **Advanced HTTP Support**: All standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- **Dynamic Response Parsing**: Automatic JSON response parsing with accessible key-value outputs
+- **Robust Error Handling**: Exponential backoff retry logic with configurable attempts
+- **Import/Export Support**: Full Terraform import and export functionality
+- **Drift Detection**: Automatic detection and handling of configuration drift
+- **Flexible Configuration**: Custom headers, query parameters, timeouts, and SSL options
 
 ## Installation
 
@@ -33,106 +37,254 @@ Run the `terraform init` command to download and install the provider.
 
 ## Provider Configuration
 
-You can configure the provider to connect to your REST API by setting up the required parameters:
+The provider supports multiple authentication methods. Choose one that fits your API requirements:
 
+### Token Authentication
 ```hcl
 provider "rest" {
-  api_token  = var.API_TOKEN
-  api_header = var.API_TOKEN_HEADER
-  api_url    = var.API_URL
+  api_url    = "https://api.example.com"
+  api_token  = "your-api-token"
+  api_header = "Authorization" # Optional, defaults to "Authorization"
 }
 ```
 
-- **api_token**: The token used for API authentication.
-- **api_header**: The HTTP header key for passing the API token.
-- **api_url**: The base URL for the REST API.
+### Certificate Authentication (PEM format)
+```hcl
+provider "rest" {
+  api_url     = "https://api.example.com"
+  client_cert = file("client.pem")
+  client_key  = file("client-key.pem")
+}
+```
+
+### Certificate Authentication (file paths)
+```hcl
+provider "rest" {
+  api_url          = "https://api.example.com"
+  client_cert_file = "/path/to/client.pem"
+  client_key_file  = "/path/to/client-key.pem"
+}
+```
+
+### PKCS12 Certificate Bundle
+```hcl
+provider "rest" {
+  api_url         = "https://api.example.com"
+  pkcs12_file     = "/path/to/certificate.p12"
+  pkcs12_password = "certificate-password"
+}
+```
+
+### Configuration Options
+
+- **api_url** (required): Base URL for the REST API
+- **timeout**: Request timeout in seconds (default: 30)
+- **insecure**: Disable SSL certificate verification (default: false)
+- **retry_attempts**: Number of retry attempts for failed requests (default: 3)
+- **max_idle_conns**: Maximum idle HTTP connections (default: 100)
 
 ## Example Usage
 
 ### Data Source
 
-To retrieve data from an API endpoint:
+Retrieve data from an API endpoint:
 
 ```hcl
-data "rest_data" "example" {
-  endpoint      = "/api"
-  timeout       = 30  # Timeout in seconds for data source request
-  insecure      = true # Disable SSL verification if needed
-  retry_attempts = 3   # Number of retry attempts for data source request
+data "rest_data" "user" {
+  endpoint = "/api/users/123"
+  method   = "GET"
+  headers = {
+    "Accept"       = "application/json"
+    "Content-Type" = "application/json"
+  }
 }
 
-output "data_response" {
-  value = data.rest_data.example.response
+# Access parsed response data
+output "user_name" {
+  value = data.rest_data.user.response_data.name
+}
+
+output "user_email" {
+  value = data.rest_data.user.response_data.email
 }
 ```
 
-### Resource Creation
-
-To create or manage a resource using the provider:
+### Basic Resource Management
 
 ```hcl
-locals {
-  resource_name = "object-1"
-}
-
-resource "rest_resource" "resource" {
-  name          = local.resource_name
-  endpoint      = "/api/config"
-  timeout       = 30  # Timeout in seconds for resource request
-  insecure      = true # Disable SSL verification if needed
-  retry_attempts = 3   # Number of retry attempts for resource request
-
+resource "rest_resource" "user" {
+  name     = "john-doe"
+  endpoint = "/api/users"
+  method   = "POST"
+  
+  headers = {
+    "Content-Type" = "application/json"
+  }
+  
   body = jsonencode({
-    metadata = {
-      name    = local.resource_name
-      disable = false
-    }
-    spec = {
-      type = {
-        data_plane_mesh = {}
-      }
-    }
+    name  = "John Doe"
+    email = "john@example.com"
+    role  = "admin"
   })
-  destroy_body = jsonencode({
-    fail_if_referred = true,
-    name             = local.resource_name,
-    namespace        = "system"
+  
+  # Optional: Custom update body
+  update_body = jsonencode({
+    name  = "John Doe"
+    email = "john@example.com"
+    role  = "admin"
+    active = true
   })
 }
 
-output "resource_response" {
-  value = rest_resource.resource.response
+# Access dynamic response data
+output "user_id" {
+  value = rest_resource.user.response_data.id
+}
+
+output "created_at" {
+  value = rest_resource.user.created_at
 }
 ```
 
-## Configuration Options
+### Advanced Resource with Custom Headers and Query Parameters
 
-- **Timeout**: Set a custom timeout (in seconds) for each request to prevent long wait times. Defaults can be overridden in both the data source and resource blocks.
-- **Insecure**: Set to `true` to disable SSL certificate verification, useful in development environments with self-signed certificates.
-- **Retry Attempts**: Specify the number of retry attempts if the initial request fails. This helps handle transient network issues or API rate limits.
+```hcl
+resource "rest_resource" "api_configuration" {
+  name     = "prod-config"
+  endpoint = "/api/v2/configurations"
+  method   = "POST"
+  
+  headers = {
+    "Content-Type"    = "application/json"
+    "X-Custom-Header" = "production"
+  }
+  
+  query_params = {
+    "environment" = "production"
+    "validate"    = "true"
+  }
+  
+  body = jsonencode({
+    name = "production-config"
+    settings = {
+      timeout     = 30
+      retry_count = 3
+      debug       = false
+    }
+  })
+  
+  timeout        = 60
+  retry_attempts = 5
+}
+```
 
-## Use Cases
+### Import Existing Resources
 
-- **Third-Party Integration**: Easily integrate with third-party services that expose REST APIs to automate configurations and management.
-- **Custom Resource Management**: Manage non-standard resources by interacting directly with proprietary or legacy REST APIs.
-- **Infrastructure-as-Code**: Treat REST API configurations as code, enabling better collaboration, review, and tracking of changes.
+```bash
+# Import existing resources using endpoint/name format
+terraform import rest_resource.existing_user "api/users/existing-user"
+```
+
+## Resource Attributes
+
+### Computed Attributes
+
+All resources provide these computed attributes for accessing response data:
+
+- **response_data**: Parsed JSON response as key-value pairs (e.g., `response_data.id`, `response_data.name`)
+- **response**: Raw response body
+- **status_code**: HTTP response status code
+- **response_headers**: HTTP response headers as key-value pairs
+- **created_at**: Timestamp when resource was created
+- **last_updated**: Timestamp when resource was last updated
+
+### Configurable Attributes
+
+- **method**: HTTP method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- **headers**: Custom HTTP headers as key-value pairs
+- **query_params**: URL query parameters as key-value pairs
+- **body**: Request body for create operations
+- **update_body**: Optional separate body for update operations
+- **destroy_body**: Optional body for delete operations
+- **timeout**: Request timeout in seconds
+- **retry_attempts**: Number of retry attempts
+- **insecure**: Disable SSL verification
+
+## Authentication Methods
+
+### Token Authentication
+Best for APIs using bearer tokens, API keys, or custom token headers.
+
+```hcl
+provider "rest" {
+  api_url    = "https://api.example.com"
+  api_token  = var.api_token
+  api_header = "X-API-Key"  # or "Authorization", "Bearer", etc.
+}
+```
+
+### mTLS Certificate Authentication
+For APIs requiring client certificate authentication:
+
+```hcl
+provider "rest" {
+  api_url     = "https://secure-api.example.com"
+  client_cert = file("${path.module}/certs/client.pem")
+  client_key  = file("${path.module}/certs/client-key.pem")
+}
+```
+
+### PKCS12 Certificates
+For enterprise environments using PKCS12 certificate bundles:
+
+```hcl
+provider "rest" {
+  api_url         = "https://enterprise-api.example.com"
+  pkcs12_file     = "/secure/certs/client.p12"
+  pkcs12_password = var.cert_password
+}
+```
 
 ## Best Practices
 
-- **API Rate Limits**: Be mindful of rate limits imposed by the REST API you are interacting with. Configure retries accordingly to avoid overwhelming the API.
-- **Security**: Avoid hardcoding API tokens directly in `.tf` files. Use environment variables or a secure Terraform variable store.
-- **Error Handling**: Always test your configuration with smaller sets of data before using in production environments. Make use of timeout and retry options to avoid issues.
+### Security
+- Use Terraform variables or environment variables for sensitive data
+- Enable SSL verification in production (`insecure = false`)
+- Store certificates in secure locations with proper permissions
+- Rotate API tokens and certificates regularly
 
-## Limitations
+### Performance
+- Configure appropriate timeouts for your API response times
+- Set retry attempts based on your API's reliability
+- Use connection pooling with `max_idle_conns` for high-throughput scenarios
 
-- **State Management**: The provider manages state for resources it creates, but other changes made directly to the REST API (outside of Terraform) may lead to drift. Use the `Read` operation to verify resource consistency.
-- **Asynchronous APIs**: Currently, asynchronous API operations are not supported. You may need additional logic to handle APIs that return immediately but perform actions asynchronously.
+### State Management
+- Leverage import functionality to bring existing resources under management
+- Use computed attributes to access dynamic response data
+- Monitor drift detection warnings in Terraform output
 
-## Future Enhancements
+## Advanced Features
 
-- **OAuth2 Support**: Adding support for OAuth2 to authenticate with APIs that use this standard.
-- **Bulk Operations**: Support for batch creating or updating multiple resources in one call.
-- **GraphQL Support**: Extending the provider to support GraphQL queries and mutations.
+### Drift Detection
+The provider automatically detects when resources change outside of Terraform and updates the state accordingly.
+
+### Dynamic Response Access
+Access any field from JSON responses directly:
+```hcl
+output "api_version" {
+  value = rest_resource.api.response_data.version
+}
+
+output "response_headers" {
+  value = rest_resource.api.response_headers
+}
+```
+
+### Import Support
+Import existing API resources into Terraform management:
+```bash
+terraform import rest_resource.existing_api_config "api/v1/config/existing-config"
+```
 
 ## Contributing
 
