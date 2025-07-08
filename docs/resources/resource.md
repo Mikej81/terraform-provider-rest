@@ -296,5 +296,6 @@ terraform import rest_resource.example "api/v1/users/user-123"
 ```
 
 This will import the resource with:
+
 - `endpoint` = "/api/v1/users"  
 - `name` = "user-123"
