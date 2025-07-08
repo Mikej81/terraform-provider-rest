@@ -59,6 +59,9 @@ type RestResourceModel struct {
 	OnFailure      types.String `tfsdk:"on_failure"`
 	FailOnStatus   types.List   `tfsdk:"fail_on_status"`
 	RetryOnStatus  types.List   `tfsdk:"retry_on_status"`
+	// Drift detection configuration
+	IgnoreFields   types.List   `tfsdk:"ignore_fields"`
+	DriftDetection types.Bool   `tfsdk:"drift_detection"`
 }
 
 func (r *RestResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -178,6 +181,16 @@ func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				MarkdownDescription: "List of HTTP status codes that should trigger a retry, in addition to the standard retryable codes.",
 				Optional:            true,
 				ElementType:         types.Int64Type,
+			},
+			"ignore_fields": schema.ListAttribute{
+				MarkdownDescription: "List of field names in the API response to ignore during drift detection. Useful for server-side metadata fields like 'created_at', 'updated_at', 'etag', etc.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
+			"drift_detection": schema.BoolAttribute{
+				MarkdownDescription: "Enable drift detection for response body changes. When enabled, compares planned vs actual response to detect configuration drift. Default: true.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -558,23 +571,12 @@ func (r *RestResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	// Check for drift in the response body if we have an expected structure
-	if len(response.Body) > 0 {
-		var parsed map[string]interface{}
-		if err := json.Unmarshal(response.Body, &parsed); err == nil {
-			// Check if the resource still exists by verifying it has the expected ID
-			if currentId, ok := parsed["id"].(string); ok {
-				expectedId := data.Id.ValueString()
-				if currentId != expectedId {
-					tflog.Warn(ctx, "detected ID drift", map[string]interface{}{
-						"expected_id": expectedId,
-						"current_id":  currentId,
-					})
-					// Update the ID to match what's on the server
-					data.Id = types.StringValue(currentId)
-				}
-			}
-		}
+	// Perform drift detection if enabled
+	if err := r.performDriftDetection(ctx, &data, response); err != nil {
+		tflog.Warn(ctx, "drift detection warning", map[string]interface{}{
+			"error": err.Error(),
+		})
+		// Continue execution - drift detection errors are warnings, not failures
 	}
 
 	tflog.Trace(ctx, "read REST resource", map[string]interface{}{
@@ -823,4 +825,207 @@ func (r *RestResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		"status_code": response.StatusCode,
 		"id":          data.Id.ValueString(),
 	})
+}
+
+// performDriftDetection compares the current API response with the expected state
+// to detect configuration drift while ignoring server-side metadata fields
+func (r *RestResource) performDriftDetection(ctx context.Context, data *RestResourceModel, response *client.Response) error {
+	// Skip drift detection if disabled
+	if !data.DriftDetection.IsNull() && !data.DriftDetection.ValueBool() {
+		return nil
+	}
+
+	// Default to enabled if not specified
+	driftEnabled := true
+	if !data.DriftDetection.IsNull() {
+		driftEnabled = data.DriftDetection.ValueBool()
+	}
+	if !driftEnabled {
+		return nil
+	}
+
+	// Parse the current response body
+	if len(response.Body) == 0 {
+		return nil
+	}
+
+	var currentData map[string]interface{}
+	if err := json.Unmarshal(response.Body, &currentData); err != nil {
+		// Not JSON or malformed - skip drift detection
+		return nil
+	}
+
+	// Get the list of fields to ignore during drift detection
+	ignoreFields := make(map[string]bool)
+	
+	// Add default fields that are commonly server-managed
+	defaultIgnoreFields := []string{
+		"id", "created_at", "updated_at", "last_modified", "etag", 
+		"version", "revision", "timestamp", "last_updated_at",
+		"created_by", "updated_by", "modified_by", "owner_id",
+		"_id", "_created", "_updated", "_modified", "_version",
+		"createdAt", "updatedAt", "lastModified", "lastUpdated",
+		"href", "self", "links", "_links", "meta", "_meta",
+	}
+	
+	for _, field := range defaultIgnoreFields {
+		ignoreFields[field] = true
+	}
+
+	// Add user-specified ignore fields
+	if !data.IgnoreFields.IsNull() {
+		userIgnoreFields := make([]string, 0, len(data.IgnoreFields.Elements()))
+		diags := data.IgnoreFields.ElementsAs(ctx, &userIgnoreFields, false)
+		if !diags.HasError() {
+			for _, field := range userIgnoreFields {
+				ignoreFields[field] = true
+			}
+		}
+	}
+
+	// Parse the expected response body if we have one
+	var expectedData map[string]interface{}
+	if !data.Body.IsNull() && data.Body.ValueString() != "" {
+		if err := json.Unmarshal([]byte(data.Body.ValueString()), &expectedData); err != nil {
+			// Expected body is not JSON - compare raw strings
+			return r.compareRawResponse(ctx, data, string(response.Body), ignoreFields)
+		}
+	} else {
+		// No expected body to compare against - just update computed fields
+		return r.updateComputedFields(ctx, data, currentData, ignoreFields)
+	}
+
+	// Compare the structured data
+	driftDetected := r.compareStructuredData(ctx, expectedData, currentData, ignoreFields, "")
+	
+	if driftDetected {
+		tflog.Warn(ctx, "configuration drift detected", map[string]interface{}{
+			"resource_id": data.Id.ValueString(),
+			"endpoint":    data.Endpoint.ValueString(),
+		})
+	}
+
+	// Always update computed fields regardless of drift
+	return r.updateComputedFields(ctx, data, currentData, ignoreFields)
+}
+
+// compareStructuredData recursively compares two JSON structures, ignoring specified fields
+func (r *RestResource) compareStructuredData(ctx context.Context, expected, current map[string]interface{}, ignoreFields map[string]bool, path string) bool {
+	driftDetected := false
+
+	// Check for missing or changed fields in expected data
+	for key, expectedValue := range expected {
+		fieldPath := key
+		if path != "" {
+			fieldPath = path + "." + key
+		}
+
+		// Skip ignored fields
+		if ignoreFields[key] {
+			continue
+		}
+
+		currentValue, exists := current[key]
+		if !exists {
+			tflog.Debug(ctx, "field missing in current response", map[string]interface{}{
+				"field": fieldPath,
+				"expected": expectedValue,
+			})
+			driftDetected = true
+			continue
+		}
+
+		// Compare values based on type
+		if !r.valuesEqual(expectedValue, currentValue) {
+			tflog.Debug(ctx, "field value drift detected", map[string]interface{}{
+				"field": fieldPath,
+				"expected": expectedValue,
+				"current": currentValue,
+			})
+			driftDetected = true
+		}
+
+		// Recursively check nested objects
+		if expectedMap, ok := expectedValue.(map[string]interface{}); ok {
+			if currentMap, ok := currentValue.(map[string]interface{}); ok {
+				if r.compareStructuredData(ctx, expectedMap, currentMap, ignoreFields, fieldPath) {
+					driftDetected = true
+				}
+			}
+		}
+	}
+
+	return driftDetected
+}
+
+// compareRawResponse compares raw string responses
+func (r *RestResource) compareRawResponse(ctx context.Context, data *RestResourceModel, currentResponse string, ignoreFields map[string]bool) error {
+	expectedResponse := data.Body.ValueString()
+	
+	if expectedResponse != currentResponse {
+		tflog.Debug(ctx, "raw response drift detected", map[string]interface{}{
+			"expected_length": len(expectedResponse),
+			"current_length":  len(currentResponse),
+		})
+	}
+
+	return nil
+}
+
+// updateComputedFields updates computed fields in the state based on the current response
+func (r *RestResource) updateComputedFields(ctx context.Context, data *RestResourceModel, currentData map[string]interface{}, ignoreFields map[string]bool) error {
+	// Update the ID if it exists in the response and is different
+	if currentId, ok := currentData["id"]; ok {
+		if idStr, ok := currentId.(string); ok {
+			expectedId := data.Id.ValueString()
+			if idStr != expectedId && expectedId != "" {
+				tflog.Debug(ctx, "updating resource ID from response", map[string]interface{}{
+					"old_id": expectedId,
+					"new_id": idStr,
+				})
+				data.Id = types.StringValue(idStr)
+			} else if expectedId == "" {
+				// Set ID if it wasn't set before
+				data.Id = types.StringValue(idStr)
+			}
+		}
+	}
+
+	// Set drift_detection to true if not explicitly set
+	if data.DriftDetection.IsNull() {
+		data.DriftDetection = types.BoolValue(true)
+	}
+
+	return nil
+}
+
+// valuesEqual compares two interface{} values for equality, handling different JSON number types
+func (r *RestResource) valuesEqual(a, b interface{}) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Handle numeric comparisons (JSON unmarshalling can create float64 or int)
+	if aNum, aOk := a.(float64); aOk {
+		if bNum, bOk := b.(float64); bOk {
+			return aNum == bNum
+		}
+		if bNum, bOk := b.(int); bOk {
+			return aNum == float64(bNum)
+		}
+	}
+	if aNum, aOk := a.(int); aOk {
+		if bNum, bOk := b.(float64); bOk {
+			return float64(aNum) == bNum
+		}
+		if bNum, bOk := b.(int); bOk {
+			return aNum == bNum
+		}
+	}
+
+	// Direct comparison for other types
+	return a == b
 }
