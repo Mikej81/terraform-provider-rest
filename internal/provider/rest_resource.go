@@ -53,6 +53,12 @@ type RestResourceModel struct {
 	Timeout         types.Int64             `tfsdk:"timeout"`
 	Insecure        types.Bool              `tfsdk:"insecure"`
 	RetryAttempts   types.Int64             `tfsdk:"retry_attempts"`
+	// Conditional operations
+	ExpectedStatus types.List   `tfsdk:"expected_status"`
+	OnSuccess      types.String `tfsdk:"on_success"`
+	OnFailure      types.String `tfsdk:"on_failure"`
+	FailOnStatus   types.List   `tfsdk:"fail_on_status"`
+	RetryOnStatus  types.List   `tfsdk:"retry_on_status"`
 }
 
 func (r *RestResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -144,6 +150,35 @@ func (r *RestResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				MarkdownDescription: "Number of retry attempts for failed requests.",
 				Optional:            true,
 			},
+			"expected_status": schema.ListAttribute{
+				MarkdownDescription: "List of expected HTTP status codes for successful operations. If specified, only these status codes will be considered successful.",
+				Optional:            true,
+				ElementType:         types.Int64Type,
+			},
+			"on_success": schema.StringAttribute{
+				MarkdownDescription: "Action to take on successful response: 'continue' (default), 'stop', or 'retry'.",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("continue", "stop", "retry"),
+				},
+			},
+			"on_failure": schema.StringAttribute{
+				MarkdownDescription: "Action to take on failed response: 'fail' (default), 'continue', or 'retry'.",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("fail", "continue", "retry"),
+				},
+			},
+			"fail_on_status": schema.ListAttribute{
+				MarkdownDescription: "List of HTTP status codes that should be treated as failures, even if they would normally be considered successful.",
+				Optional:            true,
+				ElementType:         types.Int64Type,
+			},
+			"retry_on_status": schema.ListAttribute{
+				MarkdownDescription: "List of HTTP status codes that should trigger a retry, in addition to the standard retryable codes.",
+				Optional:            true,
+				ElementType:         types.Int64Type,
+			},
 		},
 	}
 }
@@ -164,6 +199,84 @@ func (r *RestResource) Configure(ctx context.Context, req resource.ConfigureRequ
 	}
 
 	r.client = providerData.Client
+}
+
+// checkStatusCode evaluates if a status code should be considered successful based on conditional rules
+func (r *RestResource) checkStatusCode(ctx context.Context, statusCode int, data *RestResourceModel) (bool, string) {
+	// Check if this status should be treated as a failure
+	if !data.FailOnStatus.IsNull() {
+		failStatuses := make([]int64, 0, len(data.FailOnStatus.Elements()))
+		diags := data.FailOnStatus.ElementsAs(ctx, &failStatuses, false)
+		if !diags.HasError() {
+			for _, failStatus := range failStatuses {
+				if int(failStatus) == statusCode {
+					action := "fail"
+					if !data.OnFailure.IsNull() {
+						action = data.OnFailure.ValueString()
+					}
+					return false, action
+				}
+			}
+		}
+	}
+
+	// Check expected status codes if specified
+	if !data.ExpectedStatus.IsNull() {
+		expectedStatuses := make([]int64, 0, len(data.ExpectedStatus.Elements()))
+		diags := data.ExpectedStatus.ElementsAs(ctx, &expectedStatuses, false)
+		if !diags.HasError() {
+			for _, expectedStatus := range expectedStatuses {
+				if int(expectedStatus) == statusCode {
+					action := "continue"
+					if !data.OnSuccess.IsNull() {
+						action = data.OnSuccess.ValueString()
+					}
+					return true, action
+				}
+			}
+			// If expected statuses are specified but this code isn't in the list, treat as failure
+			action := "fail"
+			if !data.OnFailure.IsNull() {
+				action = data.OnFailure.ValueString()
+			}
+			return false, action
+		}
+	}
+
+	// Default behavior: 2xx codes are successful
+	if statusCode >= 200 && statusCode < 300 {
+		action := "continue"
+		if !data.OnSuccess.IsNull() {
+			action = data.OnSuccess.ValueString()
+		}
+		return true, action
+	}
+
+	// Non-2xx codes are failures by default
+	action := "fail"
+	if !data.OnFailure.IsNull() {
+		action = data.OnFailure.ValueString()
+	}
+	return false, action
+}
+
+// shouldRetryOnStatus checks if the status code should trigger a retry
+func (r *RestResource) shouldRetryOnStatus(ctx context.Context, statusCode int, data *RestResourceModel) bool {
+	// Check custom retry status codes
+	if !data.RetryOnStatus.IsNull() {
+		retryStatuses := make([]int64, 0, len(data.RetryOnStatus.Elements()))
+		diags := data.RetryOnStatus.ElementsAs(ctx, &retryStatuses, false)
+		if !diags.HasError() {
+			for _, retryStatus := range retryStatuses {
+				if int(retryStatus) == statusCode {
+					return true
+				}
+			}
+		}
+	}
+
+	// Standard retryable status codes (429, 5xx)
+	return statusCode == 429 || (statusCode >= 500 && statusCode < 600)
 }
 
 // buildRequestOptions creates client.RequestOptions from resource model
@@ -340,13 +453,36 @@ func (r *RestResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	// Check for successful status codes
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		resp.Diagnostics.AddError(
-			"API Error",
-			fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
-		)
-		return
+	// Check status code using conditional logic
+	isSuccess, action := r.checkStatusCode(ctx, response.StatusCode, &data)
+
+	if !isSuccess {
+		switch action {
+		case "continue":
+			tflog.Warn(ctx, "continuing despite failed status code", map[string]interface{}{
+				"status_code": response.StatusCode,
+				"response":    string(response.Body),
+			})
+		case "retry":
+			if r.shouldRetryOnStatus(ctx, response.StatusCode, &data) {
+				resp.Diagnostics.AddError(
+					"API Error - Retryable",
+					fmt.Sprintf("Received retryable response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+				)
+				return
+			}
+			fallthrough
+		default: // "fail"
+			resp.Diagnostics.AddError(
+				"API Error",
+				fmt.Sprintf("Received non-success response code: %d, Response: %s", response.StatusCode, string(response.Body)),
+			)
+			return
+		}
+	} else if action == "stop" {
+		tflog.Info(ctx, "stopping processing due to success action", map[string]interface{}{
+			"status_code": response.StatusCode,
+		})
 	}
 
 	// Process response
