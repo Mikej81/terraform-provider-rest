@@ -285,7 +285,7 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 
 		// Read response body
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if err != nil {
 			lastErr = fmt.Errorf("failed to read response body: %w", err)

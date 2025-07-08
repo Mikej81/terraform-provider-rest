@@ -39,10 +39,10 @@ func TestAccRestDataSource_Basic(t *testing.T) {
 		if r.URL.Path == "/test" && r.Method == "GET" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"message": "Hello, World!", "status": "success"}`)
+			_, _ = fmt.Fprintln(w, `{"message": "Hello, World!", "status": "success"}`)
 		} else {
 			w.WriteHeader(404)
-			fmt.Fprintln(w, `{"error": "Not Found"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Not Found"}`)
 		}
 	}))
 	defer server.Close()
@@ -82,22 +82,22 @@ func TestAccRestResource_Basic(t *testing.T) {
 		switch {
 		case r.URL.Path == "/items" && r.Method == "POST":
 			w.WriteHeader(201)
-			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "created"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "created"}`)
 
 		case r.URL.Path == "/items/test" && r.Method == "GET":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "active"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "active"}`)
 
 		case r.URL.Path == "/items/test" && r.Method == "PUT":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "updated"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "updated"}`)
 
 		case r.URL.Path == "/items/test" && r.Method == "DELETE":
 			w.WriteHeader(204)
 
 		default:
 			w.WriteHeader(404)
-			fmt.Fprintln(w, `{"error": "Not Found"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Not Found"}`)
 		}
 	}))
 	defer server.Close()
@@ -215,32 +215,32 @@ func TestAccRestResource_WithHeaders(t *testing.T) {
 		// Check for custom headers
 		if r.Header.Get("X-Custom-Header") != "test-value" {
 			w.WriteHeader(400)
-			fmt.Fprintln(w, `{"error": "Missing custom header"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Missing custom header"}`)
 			return
 		}
 
 		// Check for query parameters
 		if r.URL.Query().Get("filter") != "active" {
 			w.WriteHeader(400)
-			fmt.Fprintln(w, `{"error": "Missing query parameter"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Missing query parameter"}`)
 			return
 		}
 
 		switch {
 		case r.URL.Path == "/api/users" && r.Method == "POST":
 			w.WriteHeader(201)
-			fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "active"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "active"}`)
 		case r.URL.Path == "/api/users/test-user" && r.Method == "GET":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "active"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "active"}`)
 		case r.URL.Path == "/api/users/test-user" && r.Method == "PUT":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "updated"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "user-123", "name": "John Doe", "status": "updated"}`)
 		case r.URL.Path == "/api/users/test-user" && r.Method == "DELETE":
 			w.WriteHeader(204)
 		default:
 			w.WriteHeader(404)
-			fmt.Fprintln(w, `{"error": "Not Found"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Not Found"}`)
 		}
 	}))
 	defer server.Close()
@@ -276,15 +276,15 @@ func TestAccRestResource_HTTPMethods(t *testing.T) {
 		switch {
 		case r.URL.Path == "/api/items" && r.Method == "PATCH":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "item-456", "name": "Updated Item", "status": "modified"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "item-456", "name": "Updated Item", "status": "modified"}`)
 		case r.URL.Path == "/api/items/patch-test" && r.Method == "GET":
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "item-456", "name": "Updated Item", "status": "modified"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "item-456", "name": "Updated Item", "status": "modified"}`)
 		case r.URL.Path == "/api/items/patch-test" && r.Method == "DELETE":
 			w.WriteHeader(204)
 		default:
 			w.WriteHeader(404)
-			fmt.Fprintln(w, `{"error": "Not Found"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Not Found"}`)
 		}
 	}))
 	defer server.Close()
@@ -321,20 +321,20 @@ func TestAccRestResource_ErrorHandling(t *testing.T) {
 			if retryCount <= 2 {
 				// Simulate temporary server error
 				w.WriteHeader(503)
-				fmt.Fprintln(w, `{"error": "Service temporarily unavailable"}`)
+				_, _ = fmt.Fprintln(w, `{"error": "Service temporarily unavailable"}`)
 				return
 			}
 			// Success after retries
 			w.WriteHeader(201)
-			fmt.Fprintln(w, `{"id": "flaky-123", "name": "Eventually Successful", "status": "created"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "flaky-123", "name": "Eventually Successful", "status": "created"}`)
 		} else if r.URL.Path == "/api/flaky/retry-test" && r.Method == "GET" {
 			w.WriteHeader(200)
-			fmt.Fprintln(w, `{"id": "flaky-123", "name": "Eventually Successful", "status": "active"}`)
+			_, _ = fmt.Fprintln(w, `{"id": "flaky-123", "name": "Eventually Successful", "status": "active"}`)
 		} else if r.URL.Path == "/api/flaky/retry-test" && r.Method == "DELETE" {
 			w.WriteHeader(204)
 		} else {
 			w.WriteHeader(404)
-			fmt.Fprintln(w, `{"error": "Not Found"}`)
+			_, _ = fmt.Fprintln(w, `{"error": "Not Found"}`)
 		}
 	}))
 	defer server.Close()
