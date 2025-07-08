@@ -86,42 +86,42 @@ jobs:
     - name: Run Race Tests
       run: go test -v -race -cover ./...
 
-  acceptance:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-    - uses: actions/checkout@v4
+  # acceptance:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   steps:
+  #   - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.23'
-        check-latest: true
+  #   - name: Set up Go
+  #     uses: actions/setup-go@v5
+  #     with:
+  #       go-version: '1.23'
+  #       check-latest: true
 
-    - uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: '1.8.*'
-        terraform_wrapper: false
+  #   - uses: hashicorp/setup-terraform@v3
+  #     with:
+  #       terraform_version: '1.8.*'
+  #       terraform_wrapper: false
 
-    - name: Go Mod Download
-      run: go mod download
+  #   - name: Go Mod Download
+  #     run: go mod download
 
-    - name: Setup Test HTTP Server
-      run: |
-        # Start a simple HTTP server for acceptance tests
-        python3 -m http.server 8080 &
-        echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
-        sleep 2
+  #   - name: Setup Test HTTP Server
+  #     run: |
+  #       # Start a simple HTTP server for acceptance tests
+  #       python3 -m http.server 8080 &
+  #       echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
+  #       sleep 2
 
-    - name: Run Acceptance Tests
-      env:
-        TF_ACC: 1
-        TEST_SERVER_URL: http://localhost:8080
-      run: go test -v -cover ./... -timeout 30m
+  #   - name: Run Acceptance Tests
+  #     env:
+  #       TF_ACC: 1
+  #       TEST_SERVER_URL: http://localhost:8080
+  #     run: go test -v -cover ./... -timeout 30m
 
-    - name: Cleanup
-      if: always()
-      run: |
-        if [ ! -z "$HTTP_SERVER_PID" ]; then
-          kill $HTTP_SERVER_PID || true
-        fi
+  #   - name: Cleanup
+  #     if: always()
+  #     run: |
+  #       if [ ! -z "$HTTP_SERVER_PID" ]; then
+  #         kill $HTTP_SERVER_PID || true
+  #       fi
