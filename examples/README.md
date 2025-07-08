@@ -20,7 +20,7 @@ terraform {
   required_providers {
     rest = {
       source  = "local/rest"
-      version = "0.1.0"
+      version = "1.0.8"
     }
   }
 }
@@ -38,14 +38,11 @@ resource "rest_resource" "example" {
   name     = "my-resource"
   endpoint = "/api/v1/items"
   
-  # New method configuration (recommended)
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PUT"
   delete_method = "DELETE"
-  
-  # Legacy method configuration (deprecated but still supported)
-  # method = "POST"  # Only affects create operation
   
   body = jsonencode({
     name = "Example Item"
@@ -116,13 +113,13 @@ output "resource_id" {
 
 ## Key Features Demonstrated
 
-### New Method Configuration (Recommended)
+### HTTP Method Configuration
 ```hcl
 resource "rest_resource" "example" {
   name     = "my-resource"
   endpoint = "/api/resources"
   
-  # Configure methods for each CRUD operation
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"    # Method for creating resources
   read_method   = "GET"     # Method for reading resources
   update_method = "PATCH"   # Method for updating resources
@@ -150,19 +147,6 @@ resource "rest_resource" "post_only_api" {
 }
 ```
 
-### Legacy Method Configuration (Deprecated)
-```hcl
-resource "rest_resource" "legacy_example" {
-  name     = "my-resource"
-  endpoint = "/api/resources"
-  method   = "POST"  # Only affects create operation
-  
-  body = jsonencode({
-    name = "Example Resource"
-    type = "demo"
-  })
-}
-```
 
 ### Dynamic Response Access
 ```hcl

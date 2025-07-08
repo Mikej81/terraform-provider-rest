@@ -4,7 +4,7 @@ terraform {
   required_providers {
     rest = {
       source  = "local/rest"
-      version = "0.1.0"
+      version = "1.0.8"
     }
   }
 }
@@ -29,6 +29,13 @@ locals {
 resource "rest_resource" "resource" {
   name           = local.resource_name # Define the name attribute here
   endpoint       = "/api/config/namespaces/system/dc_cluster_groups"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   timeout        = 30   # Timeout in seconds for resource request
   insecure       = true # Disable SSL verification if needed
   retry_attempts = 3    # Number of retry attempts for resource request

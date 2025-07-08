@@ -290,16 +290,6 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
    }
    ```
 
-3. **Legacy method configuration (deprecated):**
-   ```terraform
-   resource "rest_resource" "legacy_resource" {
-     name     = "my-resource"
-     endpoint = "/api/resources"
-     method   = "PUT"  # Only affects create operation
-     
-     body = jsonencode({data = "value"})
-   }
-   ```
 
 ### **Resource Management Issues**
 
@@ -317,7 +307,7 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
      name     = "john-doe"  # This must match your API's identifier
      endpoint = "/users"
      
-     # Configure methods for each operation
+     # Configure HTTP methods for each CRUD operation
      create_method = "POST"
      read_method   = "GET"
      update_method = "PUT"
@@ -340,7 +330,7 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
      name     = "123"  # Use the ID from the API
      endpoint = "/users"
      
-     # Configure methods for each operation
+     # Configure HTTP methods for each CRUD operation
      create_method = "POST"
      read_method   = "GET"
      update_method = "PUT"
@@ -378,7 +368,7 @@ See [DRIFT_DETECTION.md](DRIFT_DETECTION.md) for detailed information.
      name     = "john-doe"
      endpoint = "/api/v1/users"
      
-     # Configure methods for each operation
+     # Configure HTTP methods for each CRUD operation
      create_method = "POST"
      read_method   = "GET"
      update_method = "PUT"

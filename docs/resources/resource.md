@@ -48,14 +48,11 @@ resource "rest_resource" "user" {
   name     = "john-doe"        # Unique identifier for this resource
   endpoint = "/api/users"       # API endpoint to call
   
-  # New method configuration (recommended)
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"        # HTTP method for creation
   read_method   = "GET"         # HTTP method for reading
   update_method = "PUT"         # HTTP method for updates
   delete_method = "DELETE"      # HTTP method for deletion
-  
-  # Legacy method configuration (deprecated but still supported)
-  # method = "POST"             # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"
@@ -100,7 +97,7 @@ resource "rest_resource" "api_config" {
   name     = "production-config"
   endpoint = "/api/configurations"
   
-  # Configure methods for each operation
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PATCH"       # Use PATCH for partial updates
@@ -236,12 +233,6 @@ resource "rest_resource" "existing_user" {
 
 ### Optional Settings
 
-**`method`** (String) - DEPRECATED
-
-- HTTP method for creating the resource
-- Default: `"POST"`
-- Common values: `"POST"`, `"PUT"`, `"PATCH"`
-- **Deprecated**: Use `create_method`, `read_method`, `update_method`, `delete_method` instead
 
 **`create_method`** (String)
 
@@ -442,14 +433,11 @@ resource "rest_resource" "user" {
   name     = "john-doe"
   endpoint = "/users"
   
-  # New method configuration (recommended)
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PUT"
   delete_method = "DELETE"
-  
-  # Legacy method configuration (deprecated but still supported)
-  # method = "POST"  # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"
@@ -663,25 +651,6 @@ resource "rest_resource" "mixed_methods" {
 }
 ```
 
-**Legacy Method Configuration (Backward Compatible):**
-
-```terraform
-# Most APIs use POST for creation (legacy method field)
-resource "rest_resource" "post_example" {
-  name     = "my-resource"
-  endpoint = "/resources"
-  method   = "POST"  # Only affects create operation
-  body     = jsonencode({data = "value"})
-}
-
-# Some APIs use PUT for creation (legacy method field)
-resource "rest_resource" "put_example" {
-  name     = "my-resource"
-  endpoint = "/resources"
-  method   = "PUT"   # Only affects create operation
-  body     = jsonencode({data = "value"})
-}
-```
 
 **When to Use Which Methods:**
 

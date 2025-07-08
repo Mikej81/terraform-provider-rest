@@ -5,7 +5,7 @@ terraform {
   required_providers {
     rest = {
       source  = "local/rest"
-      version = "0.1.0"
+      version = "1.0.8"
     }
   }
 }
@@ -350,10 +350,7 @@ data "rest_data" "alert_status" {
 # Get dashboard metrics
 data "rest_data" "dashboard_metrics" {
   endpoint = "/api/v1/workspaces/${rest_resource.monitoring_workspace.response_data.id}/metrics"
-  create_method = "POST"
-  read_method   = "GET"
-  update_method = "PUT"
-  delete_method = "DELETE"
+  method   = "POST"
   
   headers = {
     "Content-Type" = "application/json"

@@ -4,7 +4,8 @@
 terraform {
   required_providers {
     rest = {
-      source = "registry.terraform.io/your-org/rest"
+      source  = "registry.terraform.io/your-org/rest"
+      version = "1.0.8"
     }
   }
 }
@@ -23,6 +24,12 @@ resource "rest_resource" "user_basic" {
   endpoint = "/users"
   name     = "john-doe"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name  = "John Doe"
     email = "john@example.com"
@@ -35,6 +42,12 @@ resource "rest_resource" "user_basic" {
 resource "rest_resource" "user_custom_ignore" {
   endpoint = "/users"
   name     = "jane-doe"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name  = "Jane Doe"
@@ -59,6 +72,12 @@ resource "rest_resource" "analytics_data" {
   endpoint = "/analytics/datasets"
   name     = "user-engagement"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name        = "User Engagement Dataset"
     description = "Tracks user engagement metrics"
@@ -74,6 +93,12 @@ resource "rest_resource" "analytics_data" {
 resource "rest_resource" "blog_post" {
   endpoint = "/blog/posts"
   name     = "terraform-provider-guide"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     title   = "Terraform Provider Development Guide"
@@ -99,6 +124,12 @@ resource "rest_resource" "blog_post" {
 resource "rest_resource" "deployment" {
   endpoint = "/deployments"
   name     = "api-v2-deployment"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name        = "API v2 Deployment"

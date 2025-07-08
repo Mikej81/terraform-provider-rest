@@ -55,7 +55,7 @@ terraform {
   required_providers {
     rest = {
       source  = "Mikej81/rest"
-      version = "1.0.5"
+      version = "1.0.8"
     }
   }
 }
@@ -83,7 +83,7 @@ resource "rest_resource" "my_user" {
   name     = "john-doe"
   endpoint = "/users"
   
-  # Use specific methods for different operations
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PUT"
@@ -186,14 +186,11 @@ resource "rest_resource" "user" {
   name     = "john-doe"
   endpoint = "/api/users"
   
-  # New method configuration (recommended)
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PUT"
   delete_method = "DELETE"
-  
-  # Legacy method configuration (deprecated but still supported)
-  # method = "POST"  # Only affects create operation
   
   headers = {
     "Content-Type" = "application/json"
@@ -231,7 +228,7 @@ resource "rest_resource" "api_configuration" {
   name     = "prod-config"
   endpoint = "/api/v2/configurations"
   
-  # Configure methods for each operation
+  # Configure HTTP methods for each CRUD operation
   create_method = "POST"
   read_method   = "GET"
   update_method = "PATCH"  # Use PATCH for partial updates

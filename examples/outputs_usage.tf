@@ -4,7 +4,8 @@
 terraform {
   required_providers {
     rest = {
-      source = "registry.terraform.io/your-org/rest"
+      source  = "registry.terraform.io/your-org/rest"
+      version = "1.0.8"
     }
   }
 }
@@ -21,6 +22,12 @@ provider "rest" {
 resource "rest_resource" "user" {
   endpoint = "/users"
   name     = "john-doe"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name  = "John Doe"
@@ -55,6 +62,12 @@ resource "rest_resource" "api_key" {
   endpoint = "/api-keys"
   name     = "service-key"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name        = "Service API Key"
     permissions = ["read", "write"]
@@ -83,6 +96,12 @@ resource "rest_resource" "deployment" {
   endpoint = "/deployments"
   name     = "app-v1"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     image    = "app:v1.0"
     replicas = 3
@@ -109,6 +128,12 @@ resource "rest_resource" "project" {
   endpoint = "/projects"
   name     = "my-project"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name        = "My Project"
     description = "A sample project"
@@ -118,6 +143,12 @@ resource "rest_resource" "project" {
 resource "rest_resource" "database" {
   endpoint = "/databases"
   name     = "project-db"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name       = "project-database"
@@ -130,6 +161,12 @@ resource "rest_resource" "database" {
 resource "rest_resource" "db_user" {
   endpoint = "/database-users"
   name     = "app-user"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     username    = "app"
@@ -155,6 +192,12 @@ output "database_connection" {
 resource "rest_resource" "server" {
   endpoint = "/servers"
   name     = "web-server-1"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name         = "Web Server 1"
@@ -188,6 +231,12 @@ resource "rest_resource" "service" {
   endpoint = "/services"
   name     = "web-service"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     name = "Web Service"
     type = "web"
@@ -216,6 +265,12 @@ resource "rest_resource" "ssl_cert" {
   endpoint = "/ssl-certificates"
   name     = "web-service-cert"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     service_id = rest_resource.service.id
     domain     = rest_resource.service.response_data["domain"]
@@ -226,6 +281,12 @@ resource "rest_resource" "ssl_cert" {
 resource "rest_resource" "service_registration" {
   endpoint = "/service-registry"
   name     = "api-service"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     name = "API Service"
@@ -246,6 +307,12 @@ output "service_endpoints" {
 resource "rest_resource" "app_config" {
   endpoint = "/configurations"
   name     = "app-settings"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     app_name     = "My Application"
@@ -271,6 +338,12 @@ output "runtime_config" {
 resource "rest_resource" "metrics" {
   endpoint = "/metrics"
   name     = "app-metrics"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     metric_name = "cpu_usage"
@@ -305,6 +378,12 @@ resource "rest_resource" "debug_example" {
   endpoint = "/debug-endpoint"
   name     = "debug-test"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     test_field = "test_value"
   })
@@ -337,6 +416,12 @@ resource "rest_resource" "workflow_step1" {
   endpoint = "/workflows"
   name     = "data-processing"
   
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
+  
   body = jsonencode({
     type = "data_processing"
     input_source = "s3://my-bucket/data/"
@@ -346,6 +431,12 @@ resource "rest_resource" "workflow_step1" {
 resource "rest_resource" "workflow_step2" {
   endpoint = "/workflows/${rest_resource.workflow_step1.id}/steps"
   name     = "validation-step"
+  
+  # Configure methods for each operation
+  create_method = "POST"
+  read_method   = "GET"
+  update_method = "PUT"
+  delete_method = "DELETE"
   
   body = jsonencode({
     step_type = "validation"
