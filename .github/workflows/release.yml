@@ -100,19 +100,19 @@ jobs:
           check-latest: true
 
       - name: Import GPG key
-        if: env.GPG_PRIVATE_KEY != ''
+        if: env.GPG_KEY != ''
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
         with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_private_key: ${{ secrets.GPG_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY: ${{ secrets.GPG_KEY }}
 
       - name: Select GoReleaser config
         id: config
         run: |
-          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+          if [ -z "${{ secrets.GPG_KEY }}" ]; then
             echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
             echo "Using unsigned release config"
           else
@@ -128,24 +128,24 @@ jobs:
         id: changelog
         run: |
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          CURRENT_TAG="${{ needs.validate.outputs.version }}"
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
           
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "## Changes since $PREVIOUS_TAG" > CHANGELOG.md
-            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s" >> CHANGELOG.md
+            echo "## Changes since $PREVIOUS_TAG" > /tmp/CHANGELOG.md
+            git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s" >> /tmp/CHANGELOG.md
           else
-            echo "## Initial Release" > CHANGELOG.md
-            echo "- First release of terraform-provider-rest" >> CHANGELOG.md
+            echo "## Initial Release" > /tmp/CHANGELOG.md
+            echo "- First release of terraform-provider-rest" >> /tmp/CHANGELOG.md
           fi
           
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          cat /tmp/CHANGELOG.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Select release config
         id: release_config
         run: |
-          if [ -z "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+          if [ -z "${{ secrets.GPG_KEY }}" ]; then
             echo "config_file=.goreleaser.unsigned.yml" >> $GITHUB_OUTPUT
             echo "Using unsigned release config"
           else
