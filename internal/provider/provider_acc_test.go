@@ -27,7 +27,6 @@ func testAccPreCheck(t *testing.T) {
 	// function.
 }
 
-
 // Simple acceptance test for the data source
 func TestAccRestDataSource_Basic(t *testing.T) {
 	// Skip if not running acceptance tests
@@ -79,23 +78,23 @@ func TestAccRestResource_Basic(t *testing.T) {
 	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		switch {
 		case r.URL.Path == "/items" && r.Method == "POST":
 			w.WriteHeader(201)
 			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "created"}`)
-			
+
 		case r.URL.Path == "/items/test" && r.Method == "GET":
 			w.WriteHeader(200)
 			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "active"}`)
-			
+
 		case r.URL.Path == "/items/test" && r.Method == "PUT":
 			w.WriteHeader(200)
 			fmt.Fprintln(w, `{"id": "test-item-1", "name": "test", "status": "updated"}`)
-			
+
 		case r.URL.Path == "/items/test" && r.Method == "DELETE":
 			w.WriteHeader(204)
-			
+
 		default:
 			w.WriteHeader(404)
 			fmt.Fprintln(w, `{"error": "Not Found"}`)
@@ -229,21 +228,21 @@ func TestAccRestResource_WithHeaders(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Check for custom headers
 		if r.Header.Get("X-Custom-Header") != "test-value" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, `{"error": "Missing custom header"}`)
 			return
 		}
-		
+
 		// Check for query parameters
 		if r.URL.Query().Get("filter") != "active" {
 			w.WriteHeader(400)
 			fmt.Fprintln(w, `{"error": "Missing query parameter"}`)
 			return
 		}
-		
+
 		switch {
 		case r.URL.Path == "/api/users" && r.Method == "POST":
 			w.WriteHeader(201)
@@ -290,7 +289,7 @@ func TestAccRestResource_HTTPMethods(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		switch {
 		case r.URL.Path == "/api/items" && r.Method == "PATCH":
 			w.WriteHeader(200)
@@ -333,7 +332,7 @@ func TestAccRestResource_ErrorHandling(t *testing.T) {
 	retryCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if r.URL.Path == "/api/flaky" && r.Method == "POST" {
 			retryCount++
 			if retryCount <= 2 {

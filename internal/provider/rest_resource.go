@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -46,8 +46,8 @@ type RestResourceModel struct {
 	DestroyBody     types.String            `tfsdk:"destroy_body"`
 	Response        types.String            `tfsdk:"response"`
 	StatusCode      types.Int64             `tfsdk:"status_code"`
-	ResponseHeaders types.Map `tfsdk:"response_headers"`
-	ResponseData    types.Map `tfsdk:"response_data"`
+	ResponseHeaders types.Map               `tfsdk:"response_headers"`
+	ResponseData    types.Map               `tfsdk:"response_data"`
 	CreatedAt       types.String            `tfsdk:"created_at"`
 	LastUpdated     types.String            `tfsdk:"last_updated"`
 	Timeout         types.Int64             `tfsdk:"timeout"`
@@ -543,7 +543,7 @@ func (r *RestResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	// Process response 
+	// Process response
 	if err := r.processResponse(ctx, response, &data); err != nil {
 		resp.Diagnostics.AddError("Response Processing Error", err.Error())
 		return

@@ -157,18 +157,18 @@ func (p *restProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 
 	// Validate authentication configuration - only one method should be provided
 	authMethods := 0
-	
+
 	// Token authentication
 	if !config.APIToken.IsNull() {
 		authMethods++
 	}
-	
+
 	// Certificate authentication (either inline or file-based)
-	if (!config.ClientCert.IsNull() && !config.ClientKey.IsNull()) || 
+	if (!config.ClientCert.IsNull() && !config.ClientKey.IsNull()) ||
 		(!config.ClientCertFile.IsNull() && !config.ClientKeyFile.IsNull()) {
 		authMethods++
 	}
-	
+
 	// PKCS12 authentication (either inline or file-based)
 	if !config.PKCS12Bundle.IsNull() || !config.PKCS12File.IsNull() {
 		authMethods++
@@ -191,7 +191,7 @@ func (p *restProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 	}
 
 	// Validate certificate authentication completeness
-	if (!config.ClientCert.IsNull() && config.ClientKey.IsNull()) || 
+	if (!config.ClientCert.IsNull() && config.ClientKey.IsNull()) ||
 		(config.ClientCert.IsNull() && !config.ClientKey.IsNull()) {
 		resp.Diagnostics.AddError(
 			"Incomplete Certificate Authentication",
@@ -200,7 +200,7 @@ func (p *restProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	if (!config.ClientCertFile.IsNull() && config.ClientKeyFile.IsNull()) || 
+	if (!config.ClientCertFile.IsNull() && config.ClientKeyFile.IsNull()) ||
 		(config.ClientCertFile.IsNull() && !config.ClientKeyFile.IsNull()) {
 		resp.Diagnostics.AddError(
 			"Incomplete Certificate Authentication",

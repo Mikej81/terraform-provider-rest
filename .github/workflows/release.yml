@@ -124,7 +124,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run GoReleaser (Dry Run)
-        if: github.event.inputs.dry_run == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
@@ -135,7 +135,7 @@ jobs:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
       - name: Run GoReleaser (Release)
-        if: github.event.inputs.dry_run != 'true'
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != 'true'
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser

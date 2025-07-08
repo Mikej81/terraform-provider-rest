@@ -34,19 +34,19 @@ type RestClient struct {
 
 // Config holds the configuration for the REST client
 type Config struct {
-	BaseURL           string
+	BaseURL string
 	// Token Authentication
-	Token             string
-	TokenHeader       string
-	// Certificate Authentication  
-	ClientCert        string // PEM-encoded client certificate
-	ClientKey         string // PEM-encoded client key
-	ClientCertFile    string // Path to client certificate file
-	ClientKeyFile     string // Path to client key file
+	Token       string
+	TokenHeader string
+	// Certificate Authentication
+	ClientCert     string // PEM-encoded client certificate
+	ClientKey      string // PEM-encoded client key
+	ClientCertFile string // Path to client certificate file
+	ClientKeyFile  string // Path to client key file
 	// PKCS12 Authentication
-	PKCS12Bundle      string // Base64-encoded PKCS12 bundle
-	PKCS12File        string // Path to PKCS12 file
-	PKCS12Password    string // Password for PKCS12 bundle
+	PKCS12Bundle   string // Base64-encoded PKCS12 bundle
+	PKCS12File     string // Path to PKCS12 file
+	PKCS12Password string // Password for PKCS12 bundle
 	// General Options
 	Timeout           time.Duration
 	Insecure          bool
@@ -207,16 +207,16 @@ func (c *RestClient) Do(ctx context.Context, options RequestOptions) (*Response,
 func (c *RestClient) buildURL(endpoint string, queryParams map[string]string) (string, error) {
 	// Clean endpoint
 	endpoint = strings.TrimPrefix(endpoint, "/")
-	
+
 	// Build base URL
 	fullURL := fmt.Sprintf("%s/%s", c.baseURL, endpoint)
-	
+
 	// Parse URL for query parameters
 	parsedURL, err := url.Parse(fullURL)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Add query parameters
 	if len(queryParams) > 0 {
 		values := parsedURL.Query()
@@ -225,7 +225,7 @@ func (c *RestClient) buildURL(endpoint string, queryParams map[string]string) (s
 		}
 		parsedURL.RawQuery = values.Encode()
 	}
-	
+
 	return parsedURL.String(), nil
 }
 
@@ -235,7 +235,7 @@ func (c *RestClient) setHeaders(req *http.Request, customHeaders map[string]stri
 	for k, v := range c.headers {
 		req.Header.Set(k, v)
 	}
-	
+
 	// Set custom headers (overrides defaults)
 	for k, v := range customHeaders {
 		req.Header.Set(k, v)
@@ -245,34 +245,34 @@ func (c *RestClient) setHeaders(req *http.Request, customHeaders map[string]stri
 // executeWithRetry executes the request with exponential backoff retry logic
 func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, retries int, timeout time.Duration) (*Response, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt < retries; attempt++ {
 		// Create a new context with timeout for this attempt
 		attemptCtx, cancel := context.WithTimeout(ctx, timeout)
-		
+
 		// Clone the request for retry attempts
 		clonedReq := req.Clone(attemptCtx)
-		
+
 		// Execute the request
 		resp, err := c.httpClient.Do(clonedReq)
 		cancel()
-		
+
 		if err != nil {
 			lastErr = err
-			
+
 			// Log the retry attempt
 			tflog.Warn(ctx, fmt.Sprintf("Request attempt %d failed: %s", attempt+1, err))
-			
+
 			// Don't retry on context cancellation
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			
+
 			// Calculate backoff delay
 			if attempt < retries-1 {
 				backoffDelay := c.calculateBackoff(attempt)
 				tflog.Debug(ctx, fmt.Sprintf("Retrying in %v", backoffDelay))
-				
+
 				select {
 				case <-time.After(backoffDelay):
 					continue
@@ -282,22 +282,22 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 			}
 			continue
 		}
-		
+
 		// Read response body
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		
+
 		if err != nil {
 			lastErr = fmt.Errorf("failed to read response body: %w", err)
-			
+
 			// Log the error
 			tflog.Warn(ctx, fmt.Sprintf("Failed to read response body on attempt %d: %s", attempt+1, err))
-			
+
 			// Don't retry on body read errors for successful HTTP responses
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				return nil, lastErr
 			}
-			
+
 			if attempt < retries-1 {
 				backoffDelay := c.calculateBackoff(attempt)
 				select {
@@ -309,17 +309,17 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 			}
 			continue
 		}
-		
+
 		// Check if we should retry based on status code
 		if c.IsRetryableStatusCode(resp.StatusCode) && attempt < retries-1 {
 			lastErr = fmt.Errorf("received retryable status code %d", resp.StatusCode)
-			
+
 			// Log the retry attempt for status code
 			tflog.Warn(ctx, fmt.Sprintf("Retryable status code %d on attempt %d", resp.StatusCode, attempt+1))
-			
+
 			backoffDelay := c.calculateBackoff(attempt)
 			tflog.Debug(ctx, fmt.Sprintf("Retrying in %v due to status code %d", backoffDelay, resp.StatusCode))
-			
+
 			select {
 			case <-time.After(backoffDelay):
 				continue
@@ -327,7 +327,7 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 				return nil, ctx.Err()
 			}
 		}
-		
+
 		// Create response
 		response := &Response{
 			StatusCode: resp.StatusCode,
@@ -335,7 +335,7 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 			Headers:    resp.Header,
 			Request:    req,
 		}
-		
+
 		// Log successful request
 		tflog.Trace(ctx, "HTTP request completed", map[string]interface{}{
 			"method":      req.Method,
@@ -343,10 +343,10 @@ func (c *RestClient) executeWithRetry(ctx context.Context, req *http.Request, re
 			"status_code": resp.StatusCode,
 			"attempt":     attempt + 1,
 		})
-		
+
 		return response, nil
 	}
-	
+
 	return nil, fmt.Errorf("request failed after %d attempts: %w", retries, lastErr)
 }
 
@@ -355,12 +355,12 @@ func (c *RestClient) calculateBackoff(attempt int) time.Duration {
 	// Base delay of 1 second with exponential backoff
 	baseDelay := time.Second
 	maxDelay := 30 * time.Second
-	
+
 	delay := baseDelay * time.Duration(1<<uint(attempt))
 	if delay > maxDelay {
 		delay = maxDelay
 	}
-	
+
 	return delay
 }
 
@@ -369,7 +369,7 @@ func (c *RestClient) IsRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	// Check for specific error types that should be retried
 	switch {
 	case strings.Contains(err.Error(), "connection refused"):
