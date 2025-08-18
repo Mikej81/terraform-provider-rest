@@ -31,7 +31,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       config_file: ${{ steps.config.outputs.config_file }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -89,7 +89,7 @@ jobs:
     timeout-minutes: 30
     needs: validate
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -208,7 +208,7 @@ jobs:
     needs: [validate, goreleaser]
     if: github.event.inputs.dry_run != 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Update documentation
         run: |
