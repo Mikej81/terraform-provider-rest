@@ -225,7 +225,7 @@ jobs:
 
       - name: Create deployment issue
         if: contains(github.ref, 'v') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha')
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const version = '${{ needs.validate.outputs.version }}';
