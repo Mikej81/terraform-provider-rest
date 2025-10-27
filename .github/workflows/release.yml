@@ -190,7 +190,7 @@ jobs:
 
       - name: Upload release artifacts
         if: github.event.inputs.dry_run != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-artifacts
           path: |
